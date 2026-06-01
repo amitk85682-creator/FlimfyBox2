@@ -1,0 +1,99 @@
+ó
+    ô¬jS  ã            
+       óž  • S SK r S SKrS SKrS SKr\R
+                  " \R                  SS9  \R                  " \5      r	Sr
+S\
+4S jr\S :X  Gab  Sr
+\" S	\
+ S
+35        \R                  " \" \
+5      5      r\" S
+\" \5       S35        \" \S
+5       HO  u  rr\" S\ S35        \" S\S    35        \" S\S    S35        \" S\S    35        \" S\S   SS  S35        MQ  
+    S SKr\R,                  " 5       r\(       a¨  \R1                  5       r\ H_  r\R5                  S\S   \S   \
+" \S   5      S-   \S   S45        \R6                  S :”  a  \" S\S    S35        MP  \" S\S    S 35        Ma  
+   \R9                  5         \R;                  5         \R<                  " \5        g\" S!5        gg! \  a  r \" S"\  35         Sr C gSr C ff = f)#é    Nz)%(asctime)s - %(levelname)s - %(message)s)ÚlevelÚformatl   33ff Úqueryc           
+   ƒ   óÞ  ^#   • [         R                  R                  U 5      nSU S3n/ n [        R                  " 5        ISh  v•N nUR
+                  USS9 ISh  v•N nUR                  S:w  aF  [        R                  S UR                   35        / sSSS5      ISh  v•N   sSSS5      ISh  v•N   $ UR                  SS9I Sh  v•N nU(       a'  [        U5      S	:X  aT  US
+   R
+                  S
+5      S:X  a<  [        R                  S
+U  35        / sSSS5      ISh  v•N   sSSS5      ISh  v•N   $  UR                  S SS9  / SQn U GHR  nUR
+                  S5      n	UR
+                  S5      n
+UR
+                  S5      n
+UR
+                  S5      nU	(       a  U
+(       a   U
+(       d  M_  U	R                  5       m[        U4S jU  5       5      (       a  [        R!                  SU	 S35        M¤   [#        U
+5      n
+U
+[$        :”  a"  [        R!                  SU	 SU
+S-
+  S S35        MÜ  ['        U
+S-
+  S5      n[         R                  R                  U	5      nSU
+ SU S 3nUR)                  U	UU[+        U5      R-                  5       (       a
+  [#        U5      OS
+S!.5        GMU  
+   SSS5      ISh  v•N   SSS5      ISh  v•N   U$  GN† GNp GN/ GN! GN GN· GN©! [          a     GN¡f = f! [          a     GM­  f = f NN! , ISh  v•N  (       d  f       Nc= f NZ! , ISh  v•N  (       d  f       U$ = f! [.          a$  n[        R                  S"U 35        / s SnA$ SnAff = f7f)#zr
+Searches The Pirate Bay API for torrents.
+Returns the top 3 seeded torrents that are under the 3.8GB size limit.
+zhttps://apibay.org/q.php?q=z&cat=200Né   )Ú timeoutéÈ   zTPB API returned status )Úcontent_typeé   r   ÚidÚ0zNo results found for: c                 ó8   • [        U R                  SS5      5      $ )NÚ seedersr   )ÚintÚget)Úxs    Ú<C:\Users\hp\Downloads\Manvi-telegram-bot-main\tpb_scraper.pyÚ<lambda>Úsearch_tpb.<locals>.<lambda>'   s   € ¬C°·±°iÀÓ0CÔ,Dó    T)ÚkeyÚ reverse)ÚepubÚpdfÚmobiÚ	audiobookÚmp3ÚflacÚnameÚ	info_hashÚsizer   c              3   ó,   >#   • U  H	  oT;   v •  M
+  
+   g 7f)N© )Ú.0ÚkwÚ
+name_lowers     €r   Ú	<genexpr>Úsearch_tpb.<locals>.<genexpr>8   s   øé € ÐHÒ6G° Ö+Ò6Gùs   ƒz
+Skipping 'z' - Contains excluded keywordz' - Size too large: i   @z.2fú GBé   zmagnet:?xt=urn:btih:z&dn=z8&tr=udp%3A%2F%2Ftracker.opentrackr.org%3A1337%2Fannounce)ÚtitleÚ
+magnet_linkÚ size_gbr   zError searching TPB: )ÚurllibÚparseÚquoteÚ aiohttpÚ
+ClientSessionr   ÚstatusÚlogÚerrorÚjsonÚlenÚinfoÚsortÚ
+ValueErrorÚlowerÚanyÚdebugr   ÚMAX_SIZE_BYTESÚroundÚappendÚstrÚ isdigitÚ	Exception)r   Úformatted_queryÚurlÚ resultsÚ sessionÚresponseÚdataÚexcluded_keywordsÚitemr   r    Úsize_strr   Ú
+size_bytesr-   Úencoded_namer,   Úer&   s                     @r   Ú
+search_tpbrP      s  øé € ô
+ —l‘l×(Ñ(¨Ó/€OØ'¨Ð'8¸Ð
+A€Cà€GðBÜ×(Ò(×*Ô*¨gØ—{‘{ 3°{×3Ñ3°xØ—?‘? cÓ)Ü—I‘IÐ 8¸¿¹Ð8IÐJÔKØ÷  4×3Ð3÷ +×*Ñ*ð &Ÿ]™]¸˜]Ð=×=ö ¤ D£	¨Q£°4¸±7·;±;¸tÓ3DÈÓ3KÜ—H‘HÐ5°e°WÐ=Ô>Ø÷ 4×3Ð3÷ +×*Ñ*ðØ—I‘IÑ"DÈdIÑSò %XÐ!ä DØŸ8™8 FÓ+DØ $§¡¨Ó 5IØ#Ÿx™x¨Ó/HØ"Ÿh™h yÓ1Gæ¦y¾Ù ð "&§¡£JÜÔHÑ6GÓH×HÑHÜŸ	™	 J¨t¨fÐ4QÐ"RÔSÙ ð!Ü%(¨£]˜
+ð
+ "¤NÓ2ÜŸ	™	 J¨t¨fÐ4HÈÐW^ÑI_Ð`cÐHdÐdgÐ"hÔiÙ ô $ J°'Ñ$:¸AÓ>Gô $*§<¡<×#5Ñ#5°dÓ#;LØ$8¸¸
+À4ÈÀ~ð  VNð  #OKà—N‘NØ!%Ø'2Ø#*Ü36°w³<×3GÑ3G×3IÑ3I¤3 w¤<Èqñ	$÷ ñA !÷+ 4×3÷ +×*ðz ˆò{ +Ý3ò +ò >ò
+ 4ò +øô" "ó Úðûô, &ó !Û ð!ú÷M 4×3×3Ð3ú÷ +×*×*ðz ˆûä
+ó Ü
+	‰	Ð)¨!¨Ð-Ô.Ø	ûðüsŸ  ƒ(M-¬L< ÁK
+ÁL< Á	L!ÁKÁL!Á"4LÂL!Â"KÂ#L!Â'L< Â3KÂ4L< Â8M-Â9LÃ
+KÃA
+LÄL!Ä#KÄ$L!Ä(L< Ä4KÄ5L< Ä9M-Ä;K ÅB*LÇ7
+K1ÈB'LÊ)
+L!Ê4LÊ5L!Ê9
+L< ËLËL< Ë
+M-Ë
+L< ËL!ËL!ËL< ËLËL!ËL< Ë 
+K. Ë*LË-K. Ë.LË1
+L 	Ë;LË?L 	Ì LÌL!ÌL	Ì
+LÌL	Ì L!ÌL< Ì!L9 Ì'L*Ì(L9 Ì4L< Ì8M-Ì9L< Ì<
+M*ÍM%ÍM*Í M-Í%M*Í*M-Ú__main__zProject Hail Maryz!Testing TPB scraper with query: 'Ú'z 
+Found z	 results:r
+   z
+Result Ú:z Title: r+   zSize: r-   r)   z	Seeders: r   zMagnet: r,   éP   z...zä
+                    INSERT INTO pending_leech (url, filename, file_size, movie_title, quality, status)
+                    VALUES (%s, %s, %s, %s, %s, 'pending')
+                    ON CONFLICT (url) DO NOTHING
+                Ú1080pu   âœ… Successfully inserted 'z' into pending_leeches queue!u   â© 'z*' already exists in pending_leeches queue.u"   âŒ Failed to connect to database!u   âŒ Database insertion error: )!r1   Ú asyncioÚurllib.parser.   Ú loggingÚ
+basicConfigÚINFOÚ	getLoggerÚ__name__r4   r>   rA   rP   r   ÚprintÚrunrF   r7   Ú	enumerateÚiÚresÚdb_utilsÚget_db_connectionÚconnÚcursorÚcurÚ executeÚrowcountÚcommitÚcloseÚclose_db_connectionrC   rO   r#   r   r   Ú<module>rl      s  ðÛ Û Û Û ð × Ò ˜'Ÿ,™,Ð/ZÒ [Ø
+×Ò˜Ó!€à€ðL˜Cô Lð\ ˆzÔà€EÙ	Ð-¨e¨W°AÐ
+6Ô7àkŠk™* UÓ+Ó,€Gá	ˆH‘S˜“\N )Ð
+,Ô-Ù˜G QÖ'‰ˆˆ3Ù
+	˜!˜˜AÐÔÙ
+ ˜˜G™~Ð&Ô'Ù
+s˜9‘~Ð& cÐ*Ô+Ù
+	˜#˜i™.Ð)Ð*Ô+Ù
+˜˜]Ñ+¨C¨RÐ0Ð1°Ð5Ö6ñ
+ (ð4ÛØ×)Ò)Ó+ˆÞ
+Ø—+‘+“-ˆCÛà—
+‘
+ð ð
+ ˜
+Ñ&Ø˜ ‘LÙ˜˜I™Ó'¨%Ñ/Ø˜ ‘LØð
+ô	
+ð —<‘< !Ó#ÙÐ7¸¸G¹°~ÐEbÐcÖdá˜E # g¡, Ð/YÐZÖ[ñ! ð" 
+K‰KŒMØI‰IŒKØ×(Ò(¨Õ.áÐ6Õ7ðU øðV ó 4Ù
+Ð.¨q¨cÐ2×3Ñ3ûð4ús   Ã#CF1 Æ'F1 Æ1GÆ7
+G Ç G
