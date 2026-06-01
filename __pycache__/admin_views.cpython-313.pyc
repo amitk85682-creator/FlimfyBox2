@@ -1,0 +1,194 @@
+ó
+    ¥÷j¡)  ã                   óX  • S SK JrJrJrJrJrJrJ r Jr  S SK	r	S SK
+r
+S SK
+r
+S SKJ
+r
+  S SKrS SKr\R                   " \5      r\" S\SS9r\	R(                  R+                  S S5      rS	1rS
+ r\R3                  S
+SS
+/S9S 5       r\R3                  S5      S 5       r\R3                  SS/S9\S 5       5       r\R3                  SS
+/S9\S 5       5       rS r\R3                  SSS
+/S9\S 5       5       r\R3                  SS/S9\S 5       5       r \R3                  SSS
+/S9\S 5       5       r!g)é    )Ú	BlueprintÚrender_templateÚ requestÚredirectÚ url_forÚ sessionÚflashÚ
+current_appN)Úsecure_filenameÚadminÚ	templates)Útemplate_folderÚADMIN_WEB_SECRETÚchange_this_to_secure_valueÚcsvc                 ó6   ^ • U 4S jnT R                   Ul         U$ )Nc                  óˆ   >• [         R                  " S5      S:w  a   [        SS5        [         [	        S5      5      $ T" U 0 UD6$ )NÚ	logged_inTzPlease login to access admin.Úerrorú
+admin.login)r   Úgetr	   r   r    )ÚargsÚkwargsÚfs     €Ú4C:\Users\hp\Downloads\FlimfyBox1-main\admin_views.pyÚ wrapperÚlogin_required.<locals>.wrapper   s?   ø€ Ü
+;Š;{Ó
+# tÓ
++ÜÐ1°7Ô;ÜœG MÓ2Ó3Ð3Ù$Ð!˜&Ñ!Ð!ó    )Ú__name__)r   r   s   ` r   Úlogin_requiredr       s   ø€ õ"ð
+ —z‘z€GÔØ
+€Nr   z/admin/loginÚGETÚPOST)Ú methodsc                  óþ   • [         R                  S:X  a_  [         R                  R                   SS5      n U [        :X  a)  S[
+        S'   [
+        SS 5        [        [        S5      5      $ [
+        S	S
+5        [        S
+5      $ )Nr"   Úadmin_secretÚ Tr   zLogin successful.Ú successúadmin.add_movie_formzIncorrect secret code.r   zadmin_login.html)
+r   ÚmethodÚformr   r   r   r	   r   r    r   )Úsecrets    r   Úloginr,      sj   € ä ‡~~˜Ó Ü—‘×!Ñ! .°"Ó5ˆØ
+Ô%Ó
+%Ø#'ŒGKÑ ÜÐ% yÔ1ÜœGÐ$:Ó;Ó<Ð<äÐ*¨GÔ4Ü
+Ð-Ó
+.Ð.r   z
+/admin/logoutc                  óp   • [         R                  " SS 5        [        SS5        [         [	        S5      5      $ )Nr   z
+Logged out.r'   r   )r   Úpopr	   r   r    © r   r   Úlogoutr0   %   s*   € ä
+‡K‚K
+˜TÔ"Ü	ˆ-˜Ô#Ü
+”G˜MÓ*Ó
++Ð+r   z/adminc                  ó   • [        S5      $ )Núadmin_add_movie.html)r   r/   r   r   Úadd_movie_formr3   +   s   € ô Ð1Ó
+2Ð2r   z/admin/add_moviec            	      ó²  • [         R                  R                  SS5      R                   5       n [         R                  R                  SS5      R                   5       n[         R                  R                  SS5      R                   5       n[         R                  R                  SS5      R                   5       [         R                  R                  SS5      R                   5       S .[         R                  R                  SS5      R                   5       [         R                  R                  S	S5      R                   5       S .[         R                  R                  S
+S5      R                   5       [         R                  R                  S
+S5      R                   5       S .[         R                  R                  SS5      R                   5       [         R                  R                  S
+S5      R                   5       S .[         R                  R                  SS5      R                   5       [         R                  R                  SS5      R                   5       S .S.nU (       d   [	        SS5        [
+        [
+        S5      5      $ [        S UR                  5        5       5      (       d   [	        SS5        [
+        [
+        S5      5      $ [        R                  " 5       nU(       d   [	        SS5        [
+        [
+        S5      5      $ [        R                  " X@XU5      nU(       a  [	        SU  SU S3S5        O[	        SU  S3S5        [
+        [
+        S5      5      $ )NÚtitler&   Ú
+descriptionÚ aliasesÚq_360Ús_360©ÚurlÚsizeÚq_480Ús_480Úq_720Ús_720Úq_1080Ús_1080Úq_2160Ús_2160©z
+Low Qualityz
+SD QualityzStandard Qualityz
+HD QualityÚ4KúTitle is required.r   r(   c              3   ó*   #   • U  H	  oS    v •  M
+  
+   g7f©r;   Nr/   ©Ú.0Úqs     r   Ú	<genexpr>Ú!add_movie_post.<locals>.<genexpr>T   s   é € Ð4Ò!3˜AŽxÒ!3ùó   ‚ú.At least one quality link/file id is required.zDatabase connection failed.z Movie "z" added/updated (id=z).r'   zFailed to add/update movie "z". See logs.)r   r*   r   Ústripr	   r   r    ÚanyÚvaluesÚdb_utilsÚget_db_connectionÚupsert_movie_and_files)r5   r6   r7   Ú	qualitiesÚconnÚmovie_ids         r   Úadd_movie_postrZ   0   sŒ  € ô 
+L‰L×Ñ˜W bÓ)×/Ñ/Ó1€EÜ—,‘,×"Ñ" =°"Ó5×;Ñ;Ó=€KÜl‰l×Ñ˜y¨"Ó-×3Ñ3Ó5€Gô
+ —<‘<×#Ñ# G¨RÓ0×6Ñ6Ó8Ü—L‘L×$Ñ$ W¨bÓ1×7Ñ7Ó9ñ
+ô
+ —<‘<×#Ñ# G¨RÓ0×6Ñ6Ó8Ü—L‘L×$Ñ$ W¨bÓ1×7Ñ7Ó9ñ
+ô
+ —<‘<×#Ñ# G¨RÓ0×6Ñ6Ó8Ü—L‘L×$Ñ$ W¨bÓ1×7Ñ7Ó9ñ
+ô
+ —<‘<×#Ñ# H¨bÓ1×7Ñ7Ó9Ü—L‘L×$Ñ$ X¨rÓ2×8Ñ8Ó:ñ
+ô
+ —<‘<×#Ñ# H¨bÓ1×7Ñ7Ó9Ü—L‘L×$Ñ$ X¨rÓ2×8Ñ8Ó:ñ
+ñ#€Iö. Ü
+Ð" GÔ,Üœ Ð 6Ó7Ó8Ð8ô Ñ4 ×!1Ñ!1Ô!3Ó4×
+4Ñ
+4Ü
+Ð>À ÔHÜœ Ð 6Ó7Ó8Ð8ä
+×
+%Ò
+%Ó
+'€DÞ
+Ü
+Ð+¨WÔ5Üœ Ð 6Ó7Ó8Ð8ô ×.Ò.¨t¸KÐT[Ó\€Hæ Ü
+ ˜wÐ2°8°*¸BÐ?ÀÕKä
+Ð,¨U¨G°<Ð@À'ÔJä
+”GÐ2Ó3Ó
+4Ð4r   c                 ón   • SU ;   =(       a*    U R                  SS5      S   R                  5       [        ;   $ )NÚ.é   )ÚrsplitÚlowerÚALLOWED_EXTENSIONS)Úfilenames    r   Úallowed_filerb   g   s0   € Ø
+(‰?×
+W˜xŸ™¨s°AÓ6°qÑ9×?Ñ?ÓAÔEWÑWÐWr   z/admin/bulk_uploadc            	      ó"  • [         R                  S:X  Ga¡  S[         R                  ;  a   [         SS5        [	        [
+        S5      5      $ [         R                  S   n U R                  S:X  a   [         S S5        [	        [
+        S5      5      $ U (       Ga  [        U R                  5      (       Gaç   [        R                  " U R                  R                  5       R                  S5      5      n[        R                  " U5      n[        R                   " 5       nU(       d   [         S	S5        [	        [
+        S5      5      $ S
+nS
+nU GH&  nUR#                  S
+5      =(       d    UR#                  S5      =(       d    SR%                  5       n U (       d   US
+-
+  nMR  UR#                  S5      =(       d    UR#                  S5      =(       d    SR%                  5       nUR#                  S5      =(       d2    UR#                  S5      =(       d    UR#                  S5      =(       d    SR%                  5       UR#                  S5      =(       d    UR#                  S5      =(       d    SR%                  5       S.UR#                  S5      =(       d2    UR#                  S5      =(       d    UR#                  S5      =(       d    SR%                  5       UR#                  S5      =(       d    UR#                  S5      =(       d    SR%                  5       S.UR#                  S5      =(       d2    UR#                  S5      =(       d    UR#                  S5      =(       d    SR%                  5       UR#                  S5      =(       d    UR#                  S5      =(       d    SR%                  5       S.UR#                  S 5      =(       d2    UR#                  S!5      =(       d    UR#                  S"5      =(       d    SR%                  5       UR#                  S#5      =(       d    UR#                  S$5      =(       d    SR%                  5       S.UR#                  S%5      =(       d2    UR#                  S&5      =(       d    UR#                  S'5      =(       d    SR%                  5       UR#                  S(5      =(       d    UR#                  S)5      =(       d    SR%                  5       S.S*.n	UR#                  S+5      =(       d    UR#                  S,5      =(       d    SR%                  5       n
+['        S- U	R)                  5        5       5      (       d  US
+-
+  nGMú  [        R*                  " X7X‰U
+5      n
+U
+(       a  US
+-
+  nGM!  US
+-
+  nGM)  
+   [         S.U S/U 3S05        [	        [
+        S15      5      $ [         S4S5        [	        [
+        S5      5      $ [3        S55      $ ! [,          aB  n[.        R1                  S25        [         S3U 3S5        [	        [
+        S5      5      s S nA$ S nAff = f)6Nr"   Ú csvfilezNo file partr   zadmin.bulk_uploadr&   zNo selected filezutf-8úDB connection failedr   ÚTitler5   r]   Ú
+Descriptionr6   Ú URL_360Ú url_360Ú360pÚSize_360Úsize_360r:   Ú URL_480Ú url_480Ú480pÚSize_480Úsize_480Ú URL_720Ú url_720Ú720pÚSize_720Úsize_720ÚURL_1080Úurl_1080Ú1080pÚ	Size_1080Ú	size_1080ÚURL_2160Úurl_2160Ú2160pÚ	Size_2160Ú	size_2160rE   Ú Aliasesr7   c              3   ó*   #   • U  H	  oS    v •  M
+  
+   g7frI   r/   rJ   s     r   rM   Úbulk_upload.<locals>.<genexpr>¤   s   é € ÐDÒ1C¨A žxÒ1CùrO   zBulk upload done. Success: z
+, Failed: r'   r(   zBulk upload errorzBulk upload failed: zOnly CSV files allowed.r2   )r   r)   Úfilesr	   r   r    ra   rb   ÚioÚStringIOÚstreamÚreadÚdecoder   Ú
+DictReaderrT   rU   r   rQ   rR   rS   rV   Ú	ExceptionÚloggerÚ	exceptionr   )
+Úfiler‡   ÚreaderrX   r'   ÚfailedÚrowr5   r6   rW   r7   ÚmidÚes
+                r   Ú
+bulk_uploadr”   j   s–  € ô ‡~~˜Ô Ø
+œGŸM™MÓ
+)Ü. 'Ô*ÜœGÐ$7Ó8Ó9Ð9ä}‰}˜YÑ'ˆØ
+=‰=˜BÓ
+ÜÐ$ gÔ.ÜœGÐ$7Ó8Ó9Ð9ç
+”L §¡×/Ò/ð;
+>ÜŸš T§[¡[×%5Ñ%5Ó%7×%>Ñ%>¸wÓ%GÓHÜŸš¨Ó/Ü×1Ò1Ó3ÞÜÐ0°'Ô:Ü#¤GÐ,?Ó$@ÓAÐAà ØÜ!CØ ŸW™W WÓ-×G°·±¸Ó1A×GÀR×NÑNÓPEÞ Ø !™
+˜Ù Ø#&§7¡7¨=Ó#9×#Y¸S¿W¹WÀ]Ó=S×#YÐWY×"`Ñ"`Ó"bKð
+ %(§G¡G¨IÓ$6×$e¸#¿'¹'À)Ó:L×$eÐPS×PWÑPWÐX^ÓP_×$eÐce×#lÑ#lÓ#nØ%(§W¡W¨ZÓ%8×%U¸C¿G¹GÀJÓ<O×%UÐSU×$\Ñ$\Ó$^ñ(ð
+ %(§G¡G¨IÓ$6×$e¸#¿'¹'À)Ó:L×$eÐPS×PWÑPWÐX^ÓP_×$eÐce×#lÑ#lÓ#nØ%(§W¡W¨ZÓ%8×%U¸C¿G¹GÀJÓ<O×%UÐSU×$\Ñ$\Ó$^ñ'ð
+ %(§G¡G¨IÓ$6×$e¸#¿'¹'À)Ó:L×$eÐPS×PWÑPWÐX^ÓP_×$eÐce×#lÑ#lÓ#nØ%(§W¡W¨ZÓ%8×%U¸C¿G¹GÀJÓ<O×%UÐSU×$\Ñ$\Ó$^ñ-ð
+ %(§G¡G¨JÓ$7×$h¸3¿7¹7À:Ó;N×$hÐRU×RYÑRYÐZaÓRb×$hÐfh×#oÑ#oÓ#qØ%(§W¡W¨[Ó%9×%W¸S¿W¹WÀ[Ó=Q×%WÐUW×$^Ñ$^Ó$`ñ'ð
+ %(§G¡G¨JÓ$7×$h¸3¿7¹7À:Ó;N×$hÐRU×RYÑRYÐZaÓRb×$hÐfh×#oÑ#oÓ#qØ%(§W¡W¨[Ó%9×%W¸S¿W¹WÀ[Ó=Q×%WÐUW×$^Ñ$^Ó$`ññ#!Ið.  #Ÿw™w yÓ1×M°S·W±W¸YÓ5G×MÈ2×TÑTÓVGô ÑD°×1AÑ1AÔ1CÓD×DÑDØ !™
+˜Ú ä"×9Ò9¸$À{Ð_fÓgCÞØ 1™› à !™
+›ñU "ôX Ð3°G°9¸JÀvÀhÐOÐQZÔ[Ü¤ Ð(>Ó ?Ó@Ð@ô 
+Ð+¨WÔ5ÜœGÐ$7Ó8Ó9Ð9ô Ð1Ó
+2Ð2øô ó 
+>Ü× Ñ Ð!4Ô5ÜÐ,¨Q¨CÐ0°'Ô:Ü¤ Ð(;Ó <Ó=Õ=ûð 
+>ús&   Â1BW Å QW ×
+X×7X	ØXØ	Xz
+/admin/managec                  ó0  • [         R                  " 5       n U (       d   [        SS5        [         [	        S5      5      $ / n [         R
+                  " U 5      n[        SUS 9$ ! [          a+  n[        R                  S5        [        SS5         S nAN:S nAff = f)Nre   r   r(   z%Failed to fetch movies for managementz!Failed to fetch movies. See logs.zadmin_manage_movies.html)Úmovies)
+rT   rU   r	   r   r    Úget_all_moviesr‹   rŒ   r   r   )rX   r–   r“   s      r   Ú
+manage_moviesr˜   »   sŠ   € ô ×
+%Ò
+%Ó
+'€DÞ
+Ü
+Ð$ gÔ.Üœ Ð 6Ó7Ó8Ð8à
+€Fð<Ü×(Ò(¨Ó.ˆô Ð5¸fÑ
+EÐEøô  ó <Ü×ÑÐ@ÔAÜ
+Ð1°7×;Ñ;ûð<ús   Á A  Á 
+BÁ*!BÂBz/admin/edit/<int:movie_id>c           	      ó  • [         R                  " 5       nU(       d   [        SS5        [         [	        S5      5      $ [
+        R                  S:X  Ga  [
+        R                  R                  SS5      R                  5       n[
+        R                  R                  S S5      R                  5       n[
+        R                  R                  SS5      R                  5       n[
+        R                  R                  S	S5      R                  5       [
+        R                  R                  S
+S5      R                  5       S
+.[
+        R                  R                  SS5      R                  5       [
+        R                  R                  S
+S5      R                  5       S
+.[
+        R                  R                  SS5      R                  5       [
+        R                  R                  SS5      R                  5       S
+.[
+        R                  R                  SS5      R                  5       [
+        R                  R                  SS5      R                  5       S
+.[
+        R                  R                  SS5      R                  5       [
+        R                  R                  SS5      R                  5       S
+.S.nU(       d  [        SS5        [         [	        SU S95      $ [        S UR                  5        5       5      (       d  [        SS5        [         [	        SU S95      $ [         R                  " XX5X@S9nU(       a   [        SS5        [         [	        S5      5      $ [        SS5        [         [	        SU S95      $ S n  [         R                  " X5      n U (       d   [        SS5        [         [	        S5      5      $ [#        S U S!9$ ! [          a?  n[        R!                  S5        [        SS5        [         [	        S5      5      s S nA$ S nAff = f)"Nre   r   zadmin.manage_moviesr"   r5   r&   r6   r7   r8   r9   r:   r=   r>   r?   r@   rA   rB   rC   rD   rE   rG   zadmin.edit_movie)rY   c              3   ó*   #   • U  H	  oS    v •  M
+  
+   g7frI   r/   rJ   s     r   rM   Úedit_movie.<locals>.<genexpr>ô   s   é € Ð8Ò%7 U–8Ò%7ùrO   rP   zMovie updated.r'   z!Failed to update movie. See logs.zFailed to fetch movie for editz Failed to fetch movie. See logs.zMovie not found.zadmin_edit_movie.html)Úmovie)rT   rU   r	   r   r    r   r)   r*   r   rQ   rR   rS   rV   Úget_movie_by_idr‹   rŒ   r   r   )	rY   rX   r5   r6   r7   rW   r’   rœ   r“   s	            r   Ú
+edit_movierž   Ë   s  € ô ×
+%Ò
+%Ó
+'€DÞ
+Ü
+Ð$ gÔ.Üœ Ð 5Ó6Ó7Ð7ä ‡~~˜Ô Ü—‘× Ñ  ¨"Ó-×3Ñ3Ó5ˆÜ—l‘l×&Ñ& }°bÓ9×?Ñ?ÓAˆ
+Ü—,‘,×"Ñ" 9¨bÓ1×7Ñ7Ó9ˆ ô
+ —|‘|×'Ñ'¨ °Ó4×:Ñ:Ó<ÜŸ™×(Ñ(¨°"Ó5×;Ñ;Ó=ñô
+ —|‘|×'Ñ'¨ °Ó4×:Ñ:Ó<ÜŸ™×(Ñ(¨°"Ó5×;Ñ;Ó=ñô
+ —|‘|×'Ñ'¨ °Ó4×:Ñ:Ó<ÜŸ™×(Ñ(¨°"Ó5×;Ñ;Ó=ñ!ô
+ —|‘|×'Ñ'¨°"Ó5×;Ñ;Ó=ÜŸ™×(Ñ(¨°2Ó6×<Ñ<Ó>ñô
+ —|‘|×'Ñ'¨°"Ó5×;Ñ;Ó=ÜŸ™×(Ñ(¨°2Ó6×<Ñ<Ó>ññ#
+ˆ	ö. ÜÐ&¨ Ô0ÜœGÐ$6ÀÑJÓKÐKäÑ8 Y×%5Ñ%5Ô%7Ó8×8Ñ8ÜÐBÀGÔLÜœGÐ$6ÀÑJÓKÐKä×-Ò-¨d¸;ÐSZÑnˆÞ
+ÜÐ" IÔ.ÜœGÐ$9Ó:Ó;Ð;äÐ5°wÔ?ÜœGÐ$6ÀÑJÓKÐKð 
+€Eð8Ü×(Ò(¨Ó8ˆö Ü
+Ð  'Ô*Üœ Ð 5Ó6Ó7Ð7ä
+Ð2¸%Ñ
+@Ð@øô ó 8Ü×ÑÐ9Ô:Ü
+Ð0°'Ô:Üœ Ð 5Ó6Ó7Õ7ûð 8ús   Í4N; Î;
+PÏ4O?Ï9PÏ?P)"Úflaskr   r   r   r   r    r   r	   r
+   Úosr…   r   Úwerkzeug.utilsr
+   Ú loggingrT   Ú	getLoggerr   rŒ   r   Ú environr   r   r`   r    Úrouter,   r0   r3   rZ   rb   r”   r˜   rž   r/   r   r   Ú<module>r¦      s“  ðß e× eÓ eÛ 	Û 	Û 
+Ý *Û Û à	×	Ò	˜8Ó	$€á'˜8°[ÑA€à—:‘:—>‘>Ð"4Ð6SÓTÐ ØWÐ ò ð  ‡ˆ^ e¨V _€Ð5ñ	/ó 6ð	/ð  ‡ˆ_Óñ,ó ð,ð
+  ‡ˆX ˜w€Ð'Øñ3ó ó (ð3ð  ‡Ð
+¨&¨€Ð2Øñ35ó ó 3ð35òjXð  ‡Ð
+!¨E°6¨?€Ð;ØñM3ó ó <ðM3ð^  ‡ˆ_ u g€Ð.ØñFó ó /ðFð  ‡Ð
+)°E¸6°?€ÐCØñ@Aó ó Dñ@Ar   
