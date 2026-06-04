@@ -123,7 +123,7 @@ def t2t_fetch_next_channel(conn):
         FROM t2t_channels
         WHERE status = 'done'
           AND completed_at IS NOT NULL
-          AND completed_at < (CURRENT_TIMESTAMP - INTERVAL '24 hours')
+          AND completed_at < (CURRENT_TIMESTAMP - INTERVAL '1 hours')
         ORDER BY completed_at ASC LIMIT 1
     """)
     row = cur.fetchone()
@@ -134,7 +134,7 @@ def t2t_fetch_next_channel(conn):
     # 3. Reset this stale 'done' channel back to 'pending' for reprocessing.
     #    Preserve last_forwarded_msg_id so it resumes from where it left off.
     ch_id = row[0]
-    log.info(f"  🔄 Auto-Recheck: Channel '{row[3] or row[1]}' (ID: {ch_id}) was done >24h ago. Resetting to pending.")
+    log.info(f"  🔄 Auto-Recheck: Channel '{row[3] or row[1]}' (ID: {ch_id}) was done >1h ago. Resetting to pending.")
     t2t_update_channel(conn, ch_id, status="pending", completed_at=None)
 
     return {"id": row[0], "link": row[1], "channel_id": row[2], "title": row[3],
@@ -180,19 +180,26 @@ def t2t_get_all_channels(conn):
 
 # ── Helpers ──
 def is_video_file(message):
-    """Basic check: is this a video document with an allowed mime type?"""
+    """Basic check: is this a video document with an allowed mime type or extension?"""
     if not message.media or not isinstance(message.media, MessageMediaDocument):
         return False
     doc = message.media.document
     if not doc:
         return False
     mime = (doc.mime_type or "").lower()
-    # STRICT: mime must start with 'video/' AND be one of the allowed types
-    if not mime.startswith("video/"):
-        return False
-    if mime not in ALLOWED_MIME_TYPES:
-        return False
-    return True
+    
+    # Check mime type first
+    if mime in ALLOWED_MIME_TYPES:
+        return True
+        
+    # If mime type is weird (e.g. application/octet-stream), check filename extension
+    for attr in doc.attributes:
+        if isinstance(attr, DocumentAttributeFilename):
+            name = attr.file_name.lower()
+            if name.endswith((".mkv", ".mp4")):
+                return True
+                
+    return False
 
 def _contains_excluded_keyword(text):
     """Check if any excluded keyword appears in the text (case-insensitive)."""
