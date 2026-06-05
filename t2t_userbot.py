@@ -34,9 +34,12 @@ FILE_DELAY_MIN, FILE_DELAY_MAX = 1, 2       # Fast burst: tiny gap between files
 BATCH_MIN, BATCH_MAX = 10, 20               # Files per burst batch
 BATCH_PAUSE_MIN, BATCH_PAUSE_MAX = 15, 30   # Cooldown between burst batches
 MAX_FILES_PER_CHANNEL = 100                  # Hard cap per channel per run
-MIN_FILE_SIZE = 250 * 1024 * 1024            # 250 MB — anything smaller is junk
+MIN_FILE_SIZE = 50 * 1024 * 1024             # 50 MB — reduced from 250MB to catch web series episodes
 EXCLUDED_KEYWORDS = ["promo", "trailer", "sample", "1xbet", "sponsor", "clip"]
-ALLOWED_MIME_TYPES = {"video/mp4", "video/x-matroska"}
+ALLOWED_MIME_TYPES = {"video/mp4", "video/x-matroska", "video/webm", "video/avi",
+                     "video/quicktime", "application/octet-stream",
+                     "application/x-matroska", "video/x-msvideo"}
+ALLOWED_EXTENSIONS = {".mkv", ".mp4", ".avi", ".webm", ".mov", ".wmv", ".flv"}
 MIN_MSG_GAP = 5                              # Min gap for text commands only
 _last_msg_time = 0.0
 is_paused = False
@@ -180,7 +183,7 @@ def t2t_get_all_channels(conn):
 
 # ── Helpers ──
 def is_video_file(message):
-    """Basic check: is this a video document with an allowed mime type or extension?"""
+    """Check: is this a video document with an allowed mime type or extension?"""
     if not message.media or not isinstance(message.media, MessageMediaDocument):
         return False
     doc = message.media.document
@@ -191,13 +194,22 @@ def is_video_file(message):
     # Check mime type first
     if mime in ALLOWED_MIME_TYPES:
         return True
+    
+    # Check if mime starts with 'video/'
+    if mime.startswith("video/"):
+        return True
         
     # If mime type is weird (e.g. application/octet-stream), check filename extension
     for attr in doc.attributes:
         if isinstance(attr, DocumentAttributeFilename):
             name = attr.file_name.lower()
-            if name.endswith((".mkv", ".mp4")):
+            if any(name.endswith(ext) for ext in ALLOWED_EXTENSIONS):
                 return True
+    
+    # Also check if it has VideoAttribute (Telegram marks some videos this way)
+    for attr in doc.attributes:
+        if isinstance(attr, DocumentAttributeVideo):
+            return True
                 
     return False
 
@@ -211,23 +223,33 @@ def _contains_excluded_keyword(text):
 def is_full_movie(message):
     """
     STRICT full-movie filter. Returns True ONLY if ALL conditions pass:
-      1. Valid video mime type (video/mp4 or video/x-matroska)
-      2. File size >= 250 MB
+      1. Valid video mime type or extension
+      2. File size >= MIN_FILE_SIZE
       3. Filename and caption do NOT contain excluded keywords
     """
-    # Rule 1: MIME type check
+    # Rule 1: MIME type / extension check
     if not is_video_file(message):
+        fname = get_filename(message)
+        fsize = get_file_size(message)
+        mime = ""
+        if message.media and isinstance(message.media, MessageMediaDocument) and message.media.document:
+            mime = message.media.document.mime_type or ""
+        log.debug(f"  ⏭️ SKIP (not video): {fname} | mime: {mime} | size: {round(fsize/(1024*1024), 1)}MB")
         return False
 
-    # Rule 2: Minimum file size (250 MB)
+    # Rule 2: Minimum file size
     fsize = get_file_size(message)
     if fsize < MIN_FILE_SIZE:
+        fname = get_filename(message)
+        size_mb = round(fsize / (1024*1024), 2) if fsize else 0
+        log.debug(f"  ⏭️ SKIP (too small): {fname} | {size_mb}MB < {MIN_FILE_SIZE//(1024*1024)}MB")
         return False
 
     # Rule 3: Exclude junk keywords from filename and caption
     fname = get_filename(message)
     caption = message.text or message.message or ""
     if _contains_excluded_keyword(fname) or _contains_excluded_keyword(caption):
+        log.debug(f"  ⏭️ SKIP (excluded keyword): {fname}")
         return False
 
     return True
@@ -449,7 +471,29 @@ async def t2t_forward_channel_files(conn, channel_data):
         t2t_update_channel(conn, ch_id, status="failed", notes=f"Bot resolve error: {e}")
         return False
 
-    # Step 1: Send /superbatch
+    # Step 1: Scan channel first to check if files exist BEFORE sending /superbatch
+    log.info(f"  📡 Pre-scanning channel for valid files (from msg_id > {last_msg_id})...")
+    scan_count = 0
+    try:
+        async for message in client.iter_messages(entity, reverse=True, min_id=last_msg_id, limit=500):
+            if is_full_movie(message) and not t2t_is_already_forwarded(conn, ch_id, message.id):
+                scan_count += 1
+                if scan_count >= 3:  # Found at least 3, that's enough to proceed
+                    break
+    except Exception as e:
+        log.error(f"  ❌ Pre-scan error: {e}")
+    
+    if scan_count == 0:
+        log.info(f"  📭 No valid movie files found in channel. Skipping /superbatch.")
+        t2t_update_channel(conn, ch_id, status="done", completed_at=datetime.now(),
+                           last_forwarded_msg_id=last_msg_id,
+                           total_files_forwarded=(channel_data["forwarded"] or 0),
+                           notes="No valid files found")
+        return True  # Not an error, just nothing to forward
+    
+    log.info(f"  ✅ Pre-scan found {scan_count}+ valid files. Proceeding with /superbatch...")
+
+    # Step 2: Send /superbatch
     log.info(f"  📤 Sending /superbatch to @{FLIMFYBOX_BOT}...")
     sb = await safe_send_message(flimfy_bot, "/superbatch")
     if not sb:
@@ -458,8 +502,8 @@ async def t2t_forward_channel_files(conn, channel_data):
         return False
     await asyncio.sleep(random.uniform(5, 10))
 
-    # Step 2: Iterate channel messages (oldest-first) — BURST BATCH MODE
-    log.info(f"  📡 Scanning channel messages (from msg_id > {last_msg_id})...")
+    # Step 3: Iterate channel messages (oldest-first) — BURST BATCH MODE
+    log.info(f"  📡 Forwarding files from channel (from msg_id > {last_msg_id})...")
     run_forwarded = 0          # Files forwarded THIS run (resets each cycle, capped at 100)
     total_forwarded = channel_data["forwarded"] or 0  # Lifetime counter
     batch_count = 0
@@ -547,11 +591,18 @@ async def t2t_forward_channel_files(conn, channel_data):
                            last_forwarded_msg_id=last_msg_id, total_files_forwarded=total_forwarded)
         return False
 
-    # Step 3: Send /superdone (always, whether limit hit or channel exhausted)
-    log.info(f"  📤 Sending /superdone to @{FLIMFYBOX_BOT}...")
-    await asyncio.sleep(random.uniform(3, 6))
-    await safe_send_message(flimfy_bot, "/superdone")
-    await asyncio.sleep(random.uniform(2, 4))
+    # Step 3: Send /superdone ONLY if files were actually forwarded
+    if run_forwarded > 0:
+        log.info(f"  📤 Sending /superdone to @{FLIMFYBOX_BOT} ({run_forwarded} files forwarded)...")
+        await asyncio.sleep(random.uniform(3, 6))
+        await safe_send_message(flimfy_bot, "/superdone")
+        await asyncio.sleep(random.uniform(2, 4))
+    else:
+        log.warning(f"  ⚠️ 0 files forwarded — SKIPPING /superdone (no need to trigger empty batch)")
+        # Cancel superbatch since no files were sent
+        await asyncio.sleep(random.uniform(1, 3))
+        await safe_send_message(flimfy_bot, "/superdone")
+        await asyncio.sleep(random.uniform(1, 2))
 
     # Update channel status
     if channel_exhausted:
@@ -644,6 +695,9 @@ async def t2t_run_pipeline():
             else:
                 log.info(f"  ⏩ Channel failed/skipped.")
 
+        # ── Scraping done! Ab free time me promo bhejo ──
+        await send_promos_in_free_time()
+
         # ── STRICT Clock Sync: sleep until the NEXT hour starts ──
         wait_secs = _seconds_until_next_hour()
         next_hour = (datetime.now() + timedelta(seconds=wait_secs)).strftime("%H:%M:%S")
@@ -670,6 +724,82 @@ async def safety_check():
     log.info("  ✅ Account healthy")
     return True
 
+# ── Promo Bot Logic (Runs alongside scraper) ──
+PROMO_GROUPS = [
+    -1003731701537, -1004294114933, -1003139036639, -1003953915147, 
+    -1003085027822, -1003760514520, -1003245429631, -1003247032511
+]
+
+def generate_promo_message():
+    headers = [
+        "🔥 𝐃𝐢𝐫𝐞𝐜𝐭 𝐃𝐨𝐰𝐧𝐥𝐨𝐚𝐝 𝐅𝐢𝐥𝐞 (𝐍𝐨 𝗕𝗮𝗸𝗰𝗵𝗼𝗱𝗶)",
+        "🎬 𝐁𝐞𝐬𝐭 𝐌𝐨𝐯𝐢𝐞𝐬 & 𝐖𝐞𝐛 𝐒𝐞𝐫𝐢𝐞𝐬 (𝐍𝐨 𝐀𝐝𝐬)",
+        "🚀 𝐅𝐚𝐬𝐭 & 𝐃𝐢𝐫𝐞𝐜𝐭 𝐃𝐨𝐰𝐧𝐥𝐨𝐚𝐝 𝐋𝐢𝐧𝐤𝐬",
+        "⚡ 𝟏-𝐂𝐥𝐢𝐜𝐤 𝐃𝐨𝐰𝐧𝐥𝐨𝐚𝐝 𝐌𝐨𝐯𝐢𝐞𝐬 (𝐇𝐃)"
+    ]
+    lines = [
+        "▪️ Hollywood (Hin Dubbed)",
+        "▪️ South Indian Movies",
+        "▪️ Netflix & Amazon Series",
+        "▪️ Bollywood Blockbusters",
+        "▪️ High-Quality 4K / 1080p / 720p",
+        "▪️ Request Your Favorite Movies"
+    ]
+    footers = [
+        "👉 𝐉𝐨𝐢𝐧 𝐍𝐨𝐰: https://t.me/FlimfyBoxx",
+        "👇 𝐂𝐥𝐢𝐜𝐤 𝐇𝐞𝐫𝐞 𝐓𝐨 𝐉𝐨𝐢𝐧:\nhttps://t.me/FlimfyBoxx",
+        "🔗 𝐉𝐨𝐢𝐧 𝐎𝐮𝐫 𝐂𝐡𝐚𝐧𝐧𝐞𝐥:\nhttps://t.me/FlimfyBoxx",
+        "✅ 𝟏𝟎𝟎% 𝐀𝐝-𝐅𝐫𝐞𝐞 𝐂𝐡𝐚𝐧𝐧𝐞𝐥: https://t.me/FlimfyBoxx"
+    ]
+    random.shuffle(lines)
+    msg = f"{random.choice(headers)}\n\n"
+    msg += "\n".join(lines[:random.randint(3, 5)])
+    msg += f"\n\n{random.choice(footers)}"
+    return msg
+
+# Track which group gets promo next (round-robin style)
+_promo_index = 0
+
+async def send_promos_in_free_time():
+    """
+    Scraping khatam hone ke baad, free time me 1 random promo group me message bhejta hai.
+    Har cycle me sirf 1 group — taaki account kabhi overloaded na lage.
+    """
+    global _promo_index
+    
+    if not PROMO_GROUPS:
+        return
+    
+    # Kitna time bacha hai next hour tak?
+    remaining = _seconds_until_next_hour()
+    if remaining < 120:  # 2 min se kam bacha hai toh mat bhejo
+        log.info("  📣 [PROMO] Not enough free time (<2 min). Skipping this cycle.")
+        return
+    
+    try:
+        # Round-robin: har cycle me agla group
+        group_id = PROMO_GROUPS[_promo_index % len(PROMO_GROUPS)]
+        _promo_index += 1
+        
+        msg = generate_promo_message()
+        
+        # Thoda random delay before sending (30s-2min) — human jaisa
+        pre_delay = random.randint(30, 120)
+        log.info(f"  📣 [PROMO] Scraping done! Sending promo in {pre_delay}s...")
+        await asyncio.sleep(pre_delay)
+        
+        log.info(f"  📣 [PROMO] Sending to group {group_id}...")
+        await client.send_message(group_id, msg, link_preview=False)
+        log.info(f"  ✅ [PROMO] Sent successfully to group {group_id}!")
+        
+    except errors.FloodWaitError as e:
+        log.warning(f"  ⚠️ [PROMO] Flood wait {e.seconds}s. Will retry next cycle.")
+    except errors.UserBannedInChannelError:
+        log.warning(f"  ⚠️ [PROMO] Banned in group {group_id} — skipping.")
+    except Exception as e:
+        log.error(f"  ❌ [PROMO] Failed: {e}")
+
+
 # ── Entry Point ──
 async def start_t2t_worker():
     log.info("🤖 Starting T2T Userbot Worker...")
@@ -693,6 +823,8 @@ async def start_t2t_worker():
     if conn:
         t2t_ensure_tables(conn)
         db_utils.close_db_connection(conn)
+
+    log.info("  📣 Promo will run after each scraping cycle (sequential mode).")
 
     await t2t_run_pipeline()
     await client.disconnect()
