@@ -5664,9 +5664,21 @@ async def superbatch_start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Super Batch shuru karega"""
     if update.effective_user.id != ADMIN_USER_ID: return
     
+    # 🛑 CRITICAL FIX: Pehle se active koi bhi batch ko band karo
+    BATCH_SESSION.update({
+        'active': False, 'movie_id': None, 'movie_title': None,
+        'file_count': 0, 'admin_id': None
+    })
+    BATCH_18_SESSION.update({
+        'active': False, 'admin_id': None, 'files': [],
+        'movie_id': None, 'movie_title': None, 'file_count': 0
+    })
+    
     SUPER_BATCH_SESSION['active'] = True
     SUPER_BATCH_SESSION['admin_id'] = update.effective_user.id
     SUPER_BATCH_SESSION['files'] = []
+    
+    logger.info(f"🚀 SuperBatch STARTED by admin {update.effective_user.id}")
     
     await update.message.reply_text(
         "🚀 **SUPER BATCH MODE ON!**\n\n"
@@ -5678,46 +5690,68 @@ async def superbatch_start(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 async def superbatch_listener(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Super batch me aayi hui files ko chupchap memory me save karega"""
-    if not SUPER_BATCH_SESSION['active'] or update.effective_user.id != SUPER_BATCH_SESSION['admin_id']:
+    if not SUPER_BATCH_SESSION.get('active'):
+        return
+    if update.effective_user.id != SUPER_BATCH_SESSION.get('admin_id'):
         return
 
     message = update.effective_message
-    if not (message.document or message.video or message.audio): return
+    if not message:
+        return
+    if not (message.document or message.video or message.audio):
+        return
     
-    caption = message.caption or message.text or ""
-    file_id = None
-    file_name = "File"
-    file_size = 0
-    thumb_id = None
-    
-    if message.document:
-        file_id = message.document.file_id
-        file_name = message.document.file_name
-        file_size = message.document.file_size
-        if message.document.thumbnail: thumb_id = message.document.thumbnail.file_id
-    elif message.video:
-        file_id = message.video.file_id
-        file_name = message.video.file_name
-        file_size = message.video.file_size
-        if message.video.thumbnail: thumb_id = message.video.thumbnail.file_id
+    try:
+        caption = message.caption or message.text or ""
+        file_id = None
+        file_name = "File"
+        file_size = 0
+        thumb_id = None
+        
+        if message.document:
+            file_id = message.document.file_id
+            file_name = message.document.file_name or message.document.file_id[:20]
+            file_size = message.document.file_size or 0
+            if message.document.thumbnail: thumb_id = message.document.thumbnail.file_id
+        elif message.video:
+            file_id = message.video.file_id
+            file_name = message.video.file_name or f"video_{message.video.file_id[:10]}"
+            file_size = message.video.file_size or 0
+            if message.video.thumbnail: thumb_id = message.video.thumbnail.file_id
+        elif message.audio:
+            file_id = message.audio.file_id
+            file_name = message.audio.file_name or f"audio_{message.audio.file_id[:10]}"
+            file_size = message.audio.file_size or 0
 
-    # Queue me save karo
-    SUPER_BATCH_SESSION['files'].append({
-        'file_id': file_id,
-        'file_name': file_name,
-        'file_size': file_size,
-        'caption': caption,
-        'thumb_id': thumb_id,
-        'message_obj': message
-    })
-    
-    count = len(SUPER_BATCH_SESSION['files'])
-    if count % 10 == 0:
-        await message.reply_text(f"📥 Received {count} files so far...")
+        if not file_id:
+            logger.warning("SuperBatch: file_id is None, skipping.")
+            return
+
+        # Queue me save karo
+        SUPER_BATCH_SESSION['files'].append({
+            'file_id': file_id,
+            'file_name': file_name,
+            'file_size': file_size,
+            'caption': caption,
+            'thumb_id': thumb_id,
+            'message_obj': message
+        })
+        
+        count = len(SUPER_BATCH_SESSION['files'])
+        logger.info(f"📥 SuperBatch: File #{count} received - {file_name}")
+        
+        # Har file par confirmation (pehle 3 files + har 10th file)
+        if count <= 3 or count % 10 == 0:
+            await message.reply_text(f"📥 File #{count} received: `{file_name[:40]}`", parse_mode='Markdown')
+    except Exception as e:
+        logger.error(f"SuperBatch Listener Error: {e}", exc_info=True)
+        try:
+            await message.reply_text(f"⚠️ SuperBatch file capture error: {e}")
+        except: pass
 
 async def superbatch_done(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Smart Grouping -> Gemini AI -> TMDB -> Auto Post"""
-    if not SUPER_BATCH_SESSION['active'] or update.effective_user.id != SUPER_BATCH_SESSION['admin_id']:
+    if not SUPER_BATCH_SESSION.get('active') or update.effective_user.id != SUPER_BATCH_SESSION.get('admin_id'):
         return
 
     # 🚀 YAHAN PAR TURANT 'OFF' KAR DIYA TAAKI NORMAL BATCH KAAM KAR SAKE
@@ -5725,8 +5759,18 @@ async def superbatch_done(update: Update, context: ContextTypes.DEFAULT_TYPE):
     files = SUPER_BATCH_SESSION['files']
     SUPER_BATCH_SESSION['files'] = [] 
     
+    logger.info(f"SuperBatch DONE called. Total files captured: {len(files)}")
+    
     if not files:
-        await update.message.reply_text("❌ Koi file nahi mili!")
+        await update.message.reply_text(
+            "❌ **Koi file nahi mili!**\n\n"
+            "⚠️ **Possible reasons:**\n"
+            "• Files bhejne ke baad `/superdone` karein\n"
+            "• Files Documents ya Videos honi chahiye (Photo nahi)\n"
+            "• Bot restart hua ho to session reset ho jata hai\n\n"
+            "💡 Pehle `/superbatch` karein, phir files forward karein, phir `/superdone` karein.",
+            parse_mode='Markdown'
+        )
         return
 
     status_msg = await update.message.reply_text(f"🔄 **Grouping {len(files)} files... Please wait.**", parse_mode='Markdown')
@@ -11441,7 +11485,9 @@ def register_handlers(application: Application):
     # 🚀 SUPER BATCH COMMANDS
     application.add_handler(CommandHandler("superbatch", superbatch_start))
     application.add_handler(CommandHandler("superdone", superbatch_done))
-    application.add_handler(MessageHandler(filters.ChatType.PRIVATE & (filters.Document.ALL | filters.VIDEO), superbatch_listener), group=4)
+    # 🛑 CRITICAL FIX: group=-1 (highest priority) taaki koi bhi handler pehle intercept na kare
+    # + Audio filter bhi add kiya
+    application.add_handler(MessageHandler(filters.ChatType.PRIVATE & (filters.Document.ALL | filters.VIDEO | filters.AUDIO), superbatch_listener), group=-1)
     
     
     # ==========================================
@@ -11585,7 +11631,7 @@ def main():
         threads.append(t)
 
     # =================================================================
-    # 4. Start T2T Userbot as a separate independent process
+    # 4. Start T2T Userbot as a background process
     # =================================================================
     import subprocess
     import sys
@@ -11593,7 +11639,7 @@ def main():
     try:
         subprocess.Popen([sys.executable, "t2t_userbot.py"])
     except Exception as e:
-        logger.error(f"❌ Failed to start userbot process: {e}")
+        logger.error(f"❌ Failed to start t2t userbot process: {e}")
 
     # =================================================================
     # 5. Start Flask Server in Main Thread
