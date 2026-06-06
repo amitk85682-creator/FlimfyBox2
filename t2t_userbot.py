@@ -120,15 +120,16 @@ def t2t_fetch_next_channel(conn):
                 "last_msg_id": row[4], "found": row[5], "forwarded": row[6]}
 
     # 2. No pending channels — look for 'done' channels completed > 50 mins ago
+    fifty_mins_ago = datetime.utcnow() - timedelta(minutes=50)
     cur.execute("""
         SELECT id, channel_link, channel_id, channel_title, last_forwarded_msg_id,
                total_files_found, total_files_forwarded
         FROM t2t_channels
         WHERE status = 'done'
           AND completed_at IS NOT NULL
-          AND completed_at < (CURRENT_TIMESTAMP - INTERVAL '50 minutes')
+          AND completed_at < %s
         ORDER BY completed_at ASC LIMIT 1
-    """)
+    """, (fifty_mins_ago,))
     row = cur.fetchone()
     cur.close()
     if not row:
