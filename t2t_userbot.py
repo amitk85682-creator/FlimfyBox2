@@ -34,7 +34,7 @@ FILE_DELAY_MIN, FILE_DELAY_MAX = 1, 2       # Fast burst: tiny gap between files
 BATCH_MIN, BATCH_MAX = 10, 20               # Files per burst batch
 BATCH_PAUSE_MIN, BATCH_PAUSE_MAX = 15, 30   # Cooldown between burst batches
 MAX_FILES_PER_CHANNEL = 100                  # Hard cap per channel per run
-MIN_FILE_SIZE = 50 * 1024 * 1024             # 50 MB — reduced from 250MB to catch web series episodes
+MIN_FILE_SIZE = 10 * 1024 * 1024             # 10 MB — accept almost any video file
 EXCLUDED_KEYWORDS = ["promo", "trailer", "sample", "1xbet", "sponsor", "clip"]
 ALLOWED_MIME_TYPES = {"video/mp4", "video/x-matroska", "video/webm", "video/avi",
                      "video/quicktime", "application/octet-stream",
@@ -119,14 +119,14 @@ def t2t_fetch_next_channel(conn):
         return {"id": row[0], "link": row[1], "channel_id": row[2], "title": row[3],
                 "last_msg_id": row[4], "found": row[5], "forwarded": row[6]}
 
-    # 2. No pending channels — look for 'done' channels completed > 24 hours ago
+    # 2. No pending channels — look for 'done' channels completed > 10 mins ago
     cur.execute("""
         SELECT id, channel_link, channel_id, channel_title, last_forwarded_msg_id,
                total_files_found, total_files_forwarded
         FROM t2t_channels
         WHERE status = 'done'
           AND completed_at IS NOT NULL
-          AND completed_at < (CURRENT_TIMESTAMP - INTERVAL '1 hours')
+          AND completed_at < (CURRENT_TIMESTAMP - INTERVAL '10 minutes')
         ORDER BY completed_at ASC LIMIT 1
     """)
     row = cur.fetchone()
@@ -137,7 +137,7 @@ def t2t_fetch_next_channel(conn):
     # 3. Reset this stale 'done' channel back to 'pending' for reprocessing.
     #    Preserve last_forwarded_msg_id so it resumes from where it left off.
     ch_id = row[0]
-    log.info(f"  🔄 Auto-Recheck: Channel '{row[3] or row[1]}' (ID: {ch_id}) was done >1h ago. Resetting to pending.")
+    log.info(f"  🔄 Auto-Recheck: Channel '{row[3] or row[1]}' (ID: {ch_id}) was done >10min ago. Resetting to pending.")
     t2t_update_channel(conn, ch_id, status="pending", completed_at=None)
 
     return {"id": row[0], "link": row[1], "channel_id": row[2], "title": row[3],
@@ -473,32 +473,103 @@ async def t2t_forward_channel_files(conn, channel_data):
         t2t_update_channel(conn, ch_id, status="failed", notes=f"Bot resolve error: {e}")
         return False
 
+    # ── STEP 1: PRE-SCAN — check if channel has any valid files ──
     log.info(f"  📡 Pre-scanning channel for valid files (from msg_id > {last_msg_id})...")
+    
     scan_count = 0
     msg_scanned = 0
     already_forwarded_count = 0
+    skip_not_video = 0
+    skip_too_small = 0
+    skip_excluded = 0
+    
+    # First: RAW diagnostic — just count how many messages exist after min_id
+    raw_msg_count = 0
+    raw_doc_count = 0
+    sample_files = []
     try:
-        async for message in client.iter_messages(entity, reverse=True, min_id=last_msg_id, limit=2000):
+        async for message in client.iter_messages(entity, reverse=True, min_id=last_msg_id, limit=50):
+            raw_msg_count += 1
+            if message.media and isinstance(message.media, MessageMediaDocument):
+                raw_doc_count += 1
+                fname = get_filename(message)
+                fsize = get_file_size(message)
+                mime = message.media.document.mime_type if message.media.document else "?"
+                size_mb = round(fsize / (1024*1024), 1) if fsize else 0
+                if len(sample_files) < 5:
+                    sample_files.append(f"{fname} | {mime} | {size_mb}MB | msg_id:{message.id}")
+    except Exception as e:
+        log.error(f"  ❌ Raw diagnostic error: {e}")
+    
+    log.info(f"  🔬 RAW DIAGNOSTIC: {raw_msg_count} messages found after msg_id>{last_msg_id}, of which {raw_doc_count} are documents")
+    for sf in sample_files:
+        log.info(f"     📄 {sf}")
+    
+    # If NO messages found at all, try with min_id=0 (full rescan)
+    effective_min_id = last_msg_id
+    if raw_msg_count == 0 and last_msg_id > 0:
+        log.warning(f"  ⚠️ 0 messages after msg_id>{last_msg_id}! Trying FULL RESCAN from msg_id=0...")
+        effective_min_id = 0
+        # Re-run raw diagnostic from 0
+        try:
+            async for message in client.iter_messages(entity, reverse=True, min_id=0, limit=50):
+                raw_msg_count += 1
+                if message.media and isinstance(message.media, MessageMediaDocument):
+                    raw_doc_count += 1
+                    fname = get_filename(message)
+                    fsize = get_file_size(message)
+                    mime = message.media.document.mime_type if message.media.document else "?"
+                    size_mb = round(fsize / (1024*1024), 1) if fsize else 0
+                    if len(sample_files) < 5:
+                        sample_files.append(f"{fname} | {mime} | {size_mb}MB | msg_id:{message.id}")
+        except Exception as e:
+            log.error(f"  ❌ Full rescan diagnostic error: {e}")
+        log.info(f"  🔬 FULL RESCAN: {raw_msg_count} messages found from start, {raw_doc_count} docs")
+        for sf in sample_files:
+            log.info(f"     📄 {sf}")
+    
+    # Now do the actual is_full_movie scan
+    try:
+        async for message in client.iter_messages(entity, reverse=True, min_id=effective_min_id, limit=2000):
             msg_scanned += 1
+            
+            # Log first 3 document messages for debugging regardless
+            if message.media and isinstance(message.media, MessageMediaDocument) and msg_scanned <= 20:
+                fname = get_filename(message)
+                fsize = get_file_size(message)
+                size_mb = round(fsize / (1024*1024), 1) if fsize else 0
+                is_vid = is_video_file(message)
+                log.info(f"  🔎 MSG#{message.id}: {fname} | {size_mb}MB | is_video={is_vid}")
+            
             if is_full_movie(message):
                 if t2t_is_already_forwarded(conn, ch_id, message.id):
                     already_forwarded_count += 1
                 else:
                     scan_count += 1
-                    if scan_count >= 3:  # Found at least 3, that's enough to proceed
+                    if scan_count >= 3:
                         break
+            else:
+                # Count skip reasons
+                if message.media and isinstance(message.media, MessageMediaDocument):
+                    if not is_video_file(message):
+                        skip_not_video += 1
+                    elif get_file_size(message) < MIN_FILE_SIZE:
+                        skip_too_small += 1
+                    else:
+                        skip_excluded += 1
     except Exception as e:
         log.error(f"  ❌ Pre-scan error: {e}")
         
-    log.info(f"  🔍 Pre-scan checked {msg_scanned} messages. Found {scan_count} NEW valid files. (Skipped {already_forwarded_count} already forwarded)")
+    log.info(f"  🔍 Pre-scan result: {msg_scanned} msgs checked | {scan_count} NEW valid | {already_forwarded_count} already done")
+    log.info(f"  📊 Skip reasons: not_video={skip_not_video} | too_small(<{MIN_FILE_SIZE//(1024*1024)}MB)={skip_too_small} | excluded_keyword={skip_excluded}")
     
     if scan_count == 0:
         log.info(f"  📭 No valid movie files found in channel. Skipping /superbatch.")
         t2t_update_channel(conn, ch_id, status="done", completed_at=datetime.now(),
                            last_forwarded_msg_id=last_msg_id,
                            total_files_forwarded=(channel_data["forwarded"] or 0),
-                           notes="No valid files found")
-        return True  # Not an error, just nothing to forward
+                           notes=f"No valid files. scanned={msg_scanned} skip_vid={skip_not_video} skip_size={skip_too_small} skip_kw={skip_excluded}")
+        return True
     
     log.info(f"  ✅ Pre-scan found {scan_count}+ valid files. Proceeding with /superbatch...")
 
@@ -512,7 +583,7 @@ async def t2t_forward_channel_files(conn, channel_data):
     await asyncio.sleep(random.uniform(5, 10))
 
     # Step 3: Iterate channel messages (oldest-first) — BURST BATCH MODE
-    log.info(f"  📡 Forwarding files from channel (from msg_id > {last_msg_id})...")
+    log.info(f"  📡 Forwarding files from channel (from msg_id > {effective_min_id})...")
     run_forwarded = 0          # Files forwarded THIS run (resets each cycle, capped at 100)
     total_forwarded = channel_data["forwarded"] or 0  # Lifetime counter
     batch_count = 0
@@ -522,7 +593,7 @@ async def t2t_forward_channel_files(conn, channel_data):
     channel_exhausted = True   # True if we run out of messages naturally
 
     try:
-        async for message in client.iter_messages(entity, reverse=True, min_id=last_msg_id):
+        async for message in client.iter_messages(entity, reverse=True, min_id=effective_min_id):
             # Pause check
             if is_paused:
                 log.info("  ⏸️ Paused mid-channel. Saving progress...")
@@ -628,32 +699,23 @@ async def t2t_forward_channel_files(conn, channel_data):
     log.info(f"  📊 This run: {run_forwarded} files | Lifetime: {total_forwarded} files")
     return True
 
-# ── Main Pipeline (STRICT Clock Sync Mode) ──
-def _seconds_until_next_hour():
-    """Calculate seconds remaining until the start of the next hour."""
-    now = datetime.now()
-    seconds_past = now.minute * 60 + now.second
-    remaining = 3600 - seconds_past
-    if remaining <= 0:
-        remaining = 3600
-    return remaining
+# ── Main Pipeline (Every 15 Minutes) ──
+RUN_INTERVAL = 900  # 15 minutes in seconds
+
+def _seconds_until_next_run():
+    """Return RUN_INTERVAL seconds (15 min)."""
+    return RUN_INTERVAL
 
 async def t2t_run_pipeline():
     global is_paused
     log.info(f"\n{'═'*58}")
-    log.info(f"  🤖 T2T PIPELINE — STRICT Clock Sync Mode")
-    log.info(f"  ⏰ Runs at the top of EVERY hour (XX:00)")
+    log.info(f"  🤖 T2T PIPELINE — Runs every {RUN_INTERVAL//60} minutes")
     log.info(f"  📦 Max {MAX_FILES_PER_CHANNEL} files per channel per run")
     log.info(f"  📦 Batch: {BATCH_MIN}-{BATCH_MAX} files, then {BATCH_PAUSE_MIN}-{BATCH_PAUSE_MAX}s pause")
+    log.info(f"  📦 Min file size: {MIN_FILE_SIZE//(1024*1024)}MB")
     log.info(f"{'═'*58}")
 
-    # ── Initial Clock Sync: wait until the first XX:00 ──
-    now = datetime.now()
-    if now.minute != 0:
-        wait_secs = _seconds_until_next_hour()
-        next_hour = (now + timedelta(seconds=wait_secs)).strftime("%H:00:00")
-        log.info(f"  ⏰ Initial Clock Sync: Sleeping {wait_secs}s until {next_hour}...")
-        await asyncio.sleep(wait_secs)
+    # No initial clock sync wait — start immediately
 
     run = 0
     while True:
@@ -668,13 +730,12 @@ async def t2t_run_pipeline():
             log.info("  ✅ Telethon reconnected.")
 
         now = datetime.now()
-        log.info(f"\n  🚀 [CLOCK-WISE] Hourly T2T run #{run} starting at {now.strftime('%H:%M:%S')}...")
+        log.info(f"\n  🚀 T2T run #{run} starting at {now.strftime('%H:%M:%S')}...")
 
         conn = db_utils.get_db_connection()
         if not conn:
             log.error("  ❌ DB connection failed!")
-            # Still sleep until next hour
-            await asyncio.sleep(_seconds_until_next_hour())
+            await asyncio.sleep(_seconds_until_next_run())
             continue
 
         t2t_ensure_tables(conn)
@@ -682,7 +743,7 @@ async def t2t_run_pipeline():
 
         if not channel:
             db_utils.close_db_connection(conn)
-            log.info(f"  📭 No pending channels (all 'done' channels completed within 24h). Will recheck next hour.")
+            log.info(f"  📭 No pending channels. Will recheck in {RUN_INTERVAL//60} min.")
         else:
             log.info(f"\n{'━'*55}")
             log.info(f"  🎯 Target: {channel['title'] or channel['link']}")
@@ -704,13 +765,14 @@ async def t2t_run_pipeline():
             else:
                 log.info(f"  ⏩ Channel failed/skipped.")
 
-        # ── Scraping done! Ab free time me promo bhejo ──
-        await send_promos_in_free_time()
+        # ── Promo: send once per hour (every 4th run) ──
+        if run % 4 == 0:
+            await send_promos_in_free_time()
 
-        # ── STRICT Clock Sync: sleep until the NEXT hour starts ──
-        wait_secs = _seconds_until_next_hour()
-        next_hour = (datetime.now() + timedelta(seconds=wait_secs)).strftime("%H:%M:%S")
-        log.info(f"  ⏰ Clock Sync: Next run in {wait_secs}s (at ~{next_hour}). Sleeping...")
+        # ── Wait before next run (15 minutes) ──
+        wait_secs = _seconds_until_next_run()
+        next_time = (datetime.now() + timedelta(seconds=wait_secs)).strftime("%H:%M:%S")
+        log.info(f"  ⏰ Next run in {wait_secs//60} min (at ~{next_time}). Sleeping...")
 
         # Sleep in chunks for pause responsiveness
         slept = 0
@@ -779,8 +841,8 @@ async def send_promos_in_free_time():
     if not PROMO_GROUPS:
         return
     
-    # Kitna time bacha hai next hour tak?
-    remaining = _seconds_until_next_hour()
+    # Check remaining time
+    remaining = _seconds_until_next_run()
     if remaining < 120:  # 2 min se kam bacha hai toh mat bhejo
         log.info("  📣 [PROMO] Not enough free time (<2 min). Skipping this cycle.")
         return
