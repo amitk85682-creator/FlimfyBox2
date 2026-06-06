@@ -458,7 +458,7 @@ async def t2t_forward_channel_files(conn, channel_data):
         title = getattr(entity, 'title', link)
         resolved_id = entity.id
         t2t_update_channel(conn, ch_id, channel_id=resolved_id, channel_title=title,
-                           status="processing", started_at=datetime.now())
+                           status="processing", started_at=datetime.utcnow())
         log.info(f"  ✅ Channel resolved: {title} (ID: {resolved_id})")
     except Exception as e:
         log.error(f"  ❌ Cannot access channel '{link}': {e}")
@@ -565,7 +565,7 @@ async def t2t_forward_channel_files(conn, channel_data):
     
     if scan_count == 0:
         log.info(f"  📭 No valid movie files found in channel. Skipping /superbatch.")
-        t2t_update_channel(conn, ch_id, status="done", completed_at=datetime.now(),
+        t2t_update_channel(conn, ch_id, status="done", completed_at=datetime.utcnow(),
                            last_forwarded_msg_id=last_msg_id,
                            total_files_forwarded=(channel_data["forwarded"] or 0),
                            notes=f"No valid files. scanned={msg_scanned} skip_vid={skip_not_video} skip_size={skip_too_small} skip_kw={skip_excluded}")
@@ -687,7 +687,7 @@ async def t2t_forward_channel_files(conn, channel_data):
     # Update channel status
     if channel_exhausted:
         # All files in channel processed — mark done
-        t2t_update_channel(conn, ch_id, status="done", completed_at=datetime.now(),
+        t2t_update_channel(conn, ch_id, status="done", completed_at=datetime.utcnow(),
                            last_forwarded_msg_id=last_msg_id, total_files_forwarded=total_forwarded)
         log.info(f"  🎉 Channel '{title}' FULLY DONE! {total_forwarded} total files forwarded.")
     else:
