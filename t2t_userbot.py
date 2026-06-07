@@ -248,6 +248,20 @@ def is_full_movie(message):
         log.info(f"  ⏭️ SKIP (too small): {fname} | {size_mb}MB < {MIN_FILE_SIZE//(1024*1024)}MB")
         return False
 
+    # Rule 2.5: Duration check for files under 100MB
+    if fsize < 100 * 1024 * 1024:
+        duration = None
+        if message.media and isinstance(message.media, MessageMediaDocument) and message.media.document:
+            for attr in message.media.document.attributes:
+                if isinstance(attr, DocumentAttributeVideo):
+                    duration = attr.duration
+                    break
+        
+        if duration is None or duration < 300:
+            fname = get_filename(message)
+            log.info(f"  ⏭️ Skipped: File under 100MB and duration < 5m (or unknown): {fname}")
+            return False
+
     # Rule 3: Exclude junk keywords from filename and caption
     fname = get_filename(message)
     caption = message.text or message.message or ""
