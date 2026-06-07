@@ -464,7 +464,7 @@ async def t2t_forward_channel_files(conn, channel_data):
     except Exception as e:
         log.error(f"  ❌ Cannot access channel '{link}': {e}")
         t2t_update_channel(conn, ch_id, status="failed", notes=f"Access error: {str(e)[:200]}")
-        return False
+        return False, 0
 
     # Get FlimfyBoxBot entity
     try:
@@ -472,7 +472,7 @@ async def t2t_forward_channel_files(conn, channel_data):
     except Exception as e:
         log.error(f"  ❌ Cannot resolve @{FLIMFYBOX_BOT}: {e}")
         t2t_update_channel(conn, ch_id, status="failed", notes=f"Bot resolve error: {e}")
-        return False
+        return False, 0
 
     # ── STEP 1: PRE-SCAN — check if channel has any valid files ──
     log.info(f"  📡 Pre-scanning channel for valid files (from msg_id > {last_msg_id})...")
@@ -570,7 +570,7 @@ async def t2t_forward_channel_files(conn, channel_data):
                            last_forwarded_msg_id=last_msg_id,
                            total_files_forwarded=(channel_data["forwarded"] or 0),
                            notes=f"No valid files. scanned={msg_scanned} skip_vid={skip_not_video} skip_size={skip_too_small} skip_kw={skip_excluded}")
-        return True
+        return True, 0
     
     log.info(f"  ✅ Pre-scan found {scan_count}+ valid files. Proceeding with /superbatch...")
 
@@ -580,7 +580,7 @@ async def t2t_forward_channel_files(conn, channel_data):
     if not sb:
         log.error("  ❌ Failed to send /superbatch")
         t2t_update_channel(conn, ch_id, status="failed", notes="superbatch send failed")
-        return False
+        return False, 0
     await asyncio.sleep(random.uniform(5, 10))
 
     # Step 3: Iterate channel messages (oldest-first) — BURST BATCH MODE
@@ -665,12 +665,12 @@ async def t2t_forward_channel_files(conn, channel_data):
         log.error(f"  ❌ Channel is private/inaccessible: {link}")
         t2t_update_channel(conn, ch_id, status="failed", notes="Channel private/inaccessible",
                            last_forwarded_msg_id=last_msg_id, total_files_forwarded=total_forwarded)
-        return False
+        return False, run_forwarded
     except Exception as e:
         log.error(f"  ❌ Channel iteration error: {e}")
         t2t_update_channel(conn, ch_id, status="failed", notes=f"Iteration error: {str(e)[:200]}",
                            last_forwarded_msg_id=last_msg_id, total_files_forwarded=total_forwarded)
-        return False
+        return False, run_forwarded
 
     # Step 3: Send /superdone ONLY if files were actually forwarded
     if run_forwarded > 0:
@@ -698,7 +698,7 @@ async def t2t_forward_channel_files(conn, channel_data):
         log.info(f"  ⏸️ Channel '{title}' paused at {total_forwarded} files. Will resume next cycle.")
 
     log.info(f"  📊 This run: {run_forwarded} files | Lifetime: {total_forwarded} files")
-    return True
+    return True, run_forwarded
 
 # ── Main Pipeline (STRICT Clock Sync Mode) ──
 def _seconds_until_next_hour():
@@ -764,20 +764,27 @@ async def t2t_run_pipeline():
             log.info(f"{'━'*55}")
 
             try:
-                success = await t2t_forward_channel_files(conn, channel)
+                success, run_forwarded = await t2t_forward_channel_files(conn, channel)
             except Exception as e:
                 log.error(f"  💥 Pipeline error: {e}")
                 import traceback
                 traceback.print_exc()
                 success = False
+                run_forwarded = 0
 
             if success:
                 log.info(f"  ✅ Channel batch completed successfully.")
             else:
                 log.info(f"  ⏩ Channel failed/skipped.")
                 
-            # Short pause before jumping to the next channel in the queue
-            await asyncio.sleep(2)
+            if run_forwarded > 0:
+                log.info(f"  Forwarded {run_forwarded} files. Status marked 'done'. Resting for 1 hour to prevent FloodWait.")
+                t2t_update_channel(conn, channel["id"], status="done", completed_at=datetime.utcnow())
+                await asyncio.sleep(3600)
+            else:
+                log.info("  No new files found. Status marked 'done'. Fast skipping to next channel.")
+                t2t_update_channel(conn, channel["id"], status="done", completed_at=datetime.utcnow())
+                continue
 
         db_utils.close_db_connection(conn)
 
