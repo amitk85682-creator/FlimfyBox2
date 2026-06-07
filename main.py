@@ -11575,7 +11575,6 @@ def run_telegram_bot(token, i):
         loop.create_task(purge_temp_links_worker())
         loop.create_task(keep_alive_worker())
         # OLD: run_auto_scraper_worker() — REMOVED (replaced by T2T Worker)
-        loop.create_task(start_t2t_worker())
 
     logger.info(f"✅ Starting Polling for Bot {i+1}...")
     try:
