@@ -781,9 +781,8 @@ async def t2t_run_pipeline():
 
         db_utils.close_db_connection(conn)
 
-        # ── Promo: send once per hour (every 4th run) ──
-        if run % 4 == 0:
-            await send_promos_in_free_time()
+        # ── Promo: send once per hour after all channels are processed ──
+        await send_promos_in_free_time()
 
         # ── STRICT Clock Sync: sleep until the NEXT hour starts ──
         wait_secs = _seconds_until_next_hour()
@@ -858,7 +857,7 @@ async def send_promos_in_free_time():
         return
     
     # Check remaining time
-    remaining = _seconds_until_next_run()
+    remaining = _seconds_until_next_hour()
     if remaining < 120:  # 2 min se kam bacha hai toh mat bhejo
         log.info("  📣 [PROMO] Not enough free time (<2 min). Skipping this cycle.")
         return
