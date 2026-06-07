@@ -520,28 +520,7 @@ async def t2t_forward_channel_files(conn, channel_data):
     for sf in sample_files:
         log.info(f"     📄 {sf}")
     
-    # If NO messages found at all, try with min_id=0 (full rescan)
     effective_min_id = last_msg_id
-    if raw_msg_count == 0 and last_msg_id > 0:
-        log.warning(f"  ⚠️ 0 messages after msg_id>{last_msg_id}! Trying FULL RESCAN from msg_id=0...")
-        effective_min_id = 0
-        # Re-run raw diagnostic from 0
-        try:
-            async for message in client.iter_messages(entity, reverse=True, min_id=0, limit=50):
-                raw_msg_count += 1
-                if message.media and isinstance(message.media, MessageMediaDocument):
-                    raw_doc_count += 1
-                    fname = get_filename(message)
-                    fsize = get_file_size(message)
-                    mime = message.media.document.mime_type if message.media.document else "?"
-                    size_mb = round(fsize / (1024*1024), 1) if fsize else 0
-                    if len(sample_files) < 5:
-                        sample_files.append(f"{fname} | {mime} | {size_mb}MB | msg_id:{message.id}")
-        except Exception as e:
-            log.error(f"  ❌ Full rescan diagnostic error: {e}")
-        log.info(f"  🔬 FULL RESCAN: {raw_msg_count} messages found from start, {raw_doc_count} docs")
-        for sf in sample_files:
-            log.info(f"     📄 {sf}")
     
     # Now do the actual is_full_movie scan
     try:
