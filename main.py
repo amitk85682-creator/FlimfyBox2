@@ -66,12 +66,11 @@ class FastCache:
 search_cache = FastCache(ttl_seconds=3600)  # 1 Hour cache for SQL/Fuzzy searches
 api_movies_cache = FastCache(ttl_seconds=1800) # 30 Mins cache for Web App Home
 
-# ==================== 2. AB IMDB CHECK KAREIN (AB YE SAFE HAI) ====================
+# ==================== 2. AB IMDB CHECK KAREIN ====================
 try:
     from imdb import Cinemagoer
-    ia = Cinemagoer()  # Yahan se accessSystem hata diya hai
+    ia = Cinemagoer(accessSystem='http')  # Yahan 'http' specify karein
 except ImportError:
-    # Ab logger define ho chuka hai, toh yeh error nahi dega
     logger.warning("imdb (cinemagoer) module not found. Run: pip install cinemagoer")
     ia = None
 
