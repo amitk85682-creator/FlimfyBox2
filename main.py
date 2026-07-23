@@ -67,12 +67,26 @@ search_cache = FastCache(ttl_seconds=3600)  # 1 Hour cache for SQL/Fuzzy searche
 api_movies_cache = FastCache(ttl_seconds=1800) # 30 Mins cache for Web App Home
 
 # ==================== 2. AB IMDB CHECK KAREIN ====================
+ia = None
 try:
     from imdb import Cinemagoer
-    ia = Cinemagoer(accessSystem='http')  # Yahan 'http' specify karein
+    # Try multiple access systems - different cinemagoer versions support different ones
+    for _access in ('https', 'http', 'web', 's3'):
+        try:
+            ia = Cinemagoer(accessSystem=_access)
+            logger.info(f"Cinemagoer initialized with accessSystem='{_access}'")
+            break
+        except Exception:
+            continue
+    if ia is None:
+        # Last resort: default constructor with no args
+        try:
+            ia = Cinemagoer()
+            logger.info("Cinemagoer initialized with default settings")
+        except Exception:
+            logger.warning("Cinemagoer: all access systems failed, ia=None")
 except ImportError:
     logger.warning("imdb (cinemagoer) module not found. Run: pip install cinemagoer")
-    ia = None
 
 # ==================== 3. BAAKI IMPORTS ====================
 # Third-party imports
