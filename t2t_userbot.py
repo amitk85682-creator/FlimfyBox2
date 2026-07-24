@@ -781,8 +781,8 @@ async def t2t_run_pipeline():
 
         db_utils.close_db_connection(conn)
 
-        # ── Promo: send once per hour after all channels are processed ──
-        await send_promos_in_free_time()
+        # ── Promo: DISABLED — competitor reports se account restrict ho raha tha ──
+        # await send_promos_in_free_time()  # ⛔ DISABLED
 
         # ── STRICT Clock Sync: sleep until the NEXT hour starts ──
         wait_secs = _seconds_until_next_hour()
@@ -810,80 +810,10 @@ async def safety_check():
     log.info("  ✅ Account healthy")
     return True
 
-# ── Promo Bot Logic (Runs alongside scraper) ──
-PROMO_GROUPS = [
-    -1003731701537, -1004294114933, -1003139036639, -1003953915147, 
-    -1003085027822, -1003760514520, -1003245429631, -1003247032511
-]
-
-def generate_promo_message():
-    headers = [
-        "🔥 𝐃𝐢𝐫𝐞𝐜𝐭 𝐃𝐨𝐰𝐧𝐥𝐨𝐚𝐝 𝐅𝐢𝐥𝐞 (𝐍𝐨 𝗕𝗮𝗸𝗰𝗵𝗼𝗱𝗶)",
-        "🎬 𝐁𝐞𝐬𝐭 𝐌𝐨𝐯𝐢𝐞𝐬 & 𝐖𝐞𝐛 𝐒𝐞𝐫𝐢𝐞𝐬 (𝐍𝐨 𝐀𝐝𝐬)",
-        "🚀 𝐅𝐚𝐬𝐭 & 𝐃𝐢𝐫𝐞𝐜𝐭 𝐃𝐨𝐰𝐧𝐥𝐨𝐚𝐝 𝐋𝐢𝐧𝐤𝐬",
-        "⚡ 𝟏-𝐂𝐥𝐢𝐜𝐤 𝐃𝐨𝐰𝐧𝐥𝐨𝐚𝐝 𝐌𝐨𝐯𝐢𝐞𝐬 (𝐇𝐃)"
-    ]
-    lines = [
-        "▪️ Hollywood (Hin Dubbed)",
-        "▪️ South Indian Movies",
-        "▪️ Netflix & Amazon Series",
-        "▪️ Bollywood Blockbusters",
-        "▪️ High-Quality 4K / 1080p / 720p",
-        "▪️ Request Your Favorite Movies"
-    ]
-    footers = [
-        "👉 𝐉𝐨𝐢𝐧 𝐍𝐨𝐰: https://t.me/FlimfyBoxx",
-        "👇 𝐂𝐥𝐢𝐜𝐤 𝐇𝐞𝐫𝐞 𝐓𝐨 𝐉𝐨𝐢𝐧:\nhttps://t.me/FlimfyBoxx",
-        "🔗 𝐉𝐨𝐢𝐧 𝐎𝐮𝐫 𝐂𝐡𝐚𝐧𝐧𝐞𝐥:\nhttps://t.me/FlimfyBoxx",
-        "✅ 𝟏𝟎𝟎% 𝐀𝐝-𝐅𝐫𝐞𝐞 𝐂𝐡𝐚𝐧𝐧𝐞𝐥: https://t.me/FlimfyBoxx"
-    ]
-    random.shuffle(lines)
-    msg = f"{random.choice(headers)}\n\n"
-    msg += "\n".join(lines[:random.randint(3, 5)])
-    msg += f"\n\n{random.choice(footers)}"
-    return msg
-
-# Track which group gets promo next (round-robin style)
-_promo_index = 0
-
-async def send_promos_in_free_time():
-    """
-    Scraping khatam hone ke baad, free time me 1 random promo group me message bhejta hai.
-    Har cycle me sirf 1 group — taaki account kabhi overloaded na lage.
-    """
-    global _promo_index
-    
-    if not PROMO_GROUPS:
-        return
-    
-    # Check remaining time
-    remaining = _seconds_until_next_hour()
-    if remaining < 120:  # 2 min se kam bacha hai toh mat bhejo
-        log.info("  📣 [PROMO] Not enough free time (<2 min). Skipping this cycle.")
-        return
-    
-    try:
-        # Round-robin: har cycle me agla group
-        group_id = PROMO_GROUPS[_promo_index % len(PROMO_GROUPS)]
-        _promo_index += 1
-        
-        msg = generate_promo_message()
-        
-        # Thoda random delay before sending (30s-2min) — human jaisa
-        pre_delay = random.randint(30, 120)
-        log.info(f"  📣 [PROMO] Scraping done! Sending promo in {pre_delay}s...")
-        await asyncio.sleep(pre_delay)
-        
-        log.info(f"  📣 [PROMO] Sending to group {group_id}...")
-        await client.send_message(group_id, msg, link_preview=False)
-        log.info(f"  ✅ [PROMO] Sent successfully to group {group_id}!")
-        
-    except errors.FloodWaitError as e:
-        log.warning(f"  ⚠️ [PROMO] Flood wait {e.seconds}s. Will retry next cycle.")
-    except errors.UserBannedInChannelError:
-        log.warning(f"  ⚠️ [PROMO] Banned in group {group_id} — skipping.")
-    except Exception as e:
-        log.error(f"  ❌ [PROMO] Failed: {e}")
+# ── Promo Bot Logic — ⛔ COMPLETELY DISABLED ──
+# Competitor channels report karke account restrict karwa rahe the.
+# Promo system permanently band kar diya gaya hai.
+# Agar future mein chahiye toh Git history se restore karo.
 
 
 # ── Entry Point ──
@@ -910,7 +840,7 @@ async def start_t2t_worker():
         t2t_ensure_tables(conn)
         db_utils.close_db_connection(conn)
 
-    log.info("  📣 Promo will run after each scraping cycle (sequential mode).")
+    log.info("  ⛔ Promo system is DISABLED. Only scraping will run.")
 
     await t2t_run_pipeline()
     await client.disconnect()
