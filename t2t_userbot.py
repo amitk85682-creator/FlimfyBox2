@@ -2,7 +2,7 @@
 T2T Userbot — Telegram-to-Telegram Channel Forwarder
 Forwards MKV/MP4 files from target channels to @FlimfyBoxBot PM.
 """
-import os, re, sys, random, asyncio, logging, json
+import os, re, sys, random, asyncio, logging, json, unicodedata
 from datetime import datetime, timedelta
 try:
     from dotenv import load_dotenv
@@ -554,7 +554,9 @@ async def safe_click(message, **kwargs):
 def _find_button(message, text_fragment: str):
     """
     Find a button in the message's inline keyboard whose text contains
-    the given fragment (case-insensitive). Returns (row_idx, btn_idx) or None.
+    the given fragment (case-insensitive). Handles fancy Unicode fonts
+    (e.g., 𝗔𝗟𝗟 𝗙𝗜𝗟𝗘𝗦) by normalizing with NFKC first.
+    Returns (row_idx, btn_idx) or None.
     """
     if not message.reply_markup:
         return None
@@ -562,7 +564,8 @@ def _find_button(message, text_fragment: str):
     fragment_lower = text_fragment.lower()
     for r_idx, row in enumerate(rows):
         for b_idx, btn in enumerate(row.buttons):
-            if fragment_lower in (btn.text or "").lower():
+            btn_text = unicodedata.normalize('NFKC', btn.text or "").lower()
+            if fragment_lower in btn_text:
                 return (r_idx, b_idx)
     return None
 
