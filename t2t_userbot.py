@@ -2,7 +2,7 @@
 T2T Userbot — Telegram-to-Telegram Channel Forwarder
 Forwards MKV/MP4 files from target channels to @FlimfyBoxBot PM.
 """
-import os, re, sys, random, asyncio, logging
+import os, re, sys, random, asyncio, logging, json
 from datetime import datetime, timedelta
 try:
     from dotenv import load_dotenv
@@ -14,9 +14,15 @@ try:
     from telethon import TelegramClient, events, errors
     from telethon.tl.types import DocumentAttributeFilename, DocumentAttributeVideo, MessageMediaDocument
     from telethon.sessions import StringSession
+    from telethon.errors import MessageNotModifiedError
 except ImportError:
     print("pip install telethon")
     sys.exit(1)
+
+try:
+    import aiohttp
+except ImportError:
+    aiohttp = None
 
 import db_utils
 
@@ -44,6 +50,30 @@ MIN_MSG_GAP = 5                              # Min gap for text commands only
 _last_msg_time = 0.0
 is_paused = False
 _resume_event = None
+
+# ── FindBatchID Config ──
+TMDB_API_KEY = os.environ.get("TMDB_API_KEY", "9fa44f5e9fbd41415df930ce5b81c4d7")
+TARGET_BOT = "Searchmovie4u_bot"
+FILE_COLLECT_TIMEOUT = 15        # Seconds to wait for new files before assuming batch done
+SEASON_COOLDOWN_MIN = 10         # Delay between seasons (min)
+SEASON_COOLDOWN_MAX = 20         # Delay between seasons (max)
+BUTTON_CLICK_DELAY_MIN = 3       # Delay before clicking a button (min)
+BUTTON_CLICK_DELAY_MAX = 6       # Delay before clicking a button (max)
+SEARCH_MSG_DELAY_MIN = 2         # Delay before sending search query (min)
+SEARCH_MSG_DELAY_MAX = 4         # Delay before sending search query (max)
+_findbatch_running = False       # Guard against concurrent /findbatchid runs
+
+# Robust regex to detect "Episode 1" / "E01" / "S01E01" etc.
+EPISODE_1_PATTERN = re.compile(
+    r'(?i)'
+    r'(?:'
+        r'S\d{1,2}\s*E\s*0*1(?!\d)'    # S01E01, S1E1, S01 E 01
+        r'|(?<!\d)E\s*0*1(?!\d)'         # E01, E1 (not part of larger number)
+        r'|Ep\s*\.?\s*0*1(?!\d)'         # Ep01, Ep.01, Ep 1
+        r'|Episode\s*0*1(?!\d)'          # Episode 01, Episode 1
+        r'|\b0*1\s*of\s*\d+'             # "1 of 10", "01 of 12"
+    r')'
+)
 
 if not SESSION_STRING:
     print("\n❌ USERBOT_SESSION not found in .env!")
@@ -357,6 +387,538 @@ async def wait_for_resume():
     await _resume_event.wait()
     log.info("  ▶️ Resumed!")
 
+# ══════════════════════════════════════════════════════════════════════════════
+# 🎯 FindBatchID — TMDB Metadata + Target Bot Scraping + Auto Forward
+# ══════════════════════════════════════════════════════════════════════════════
+
+async def fetch_tmdb_metadata(imdb_id: str) -> dict:
+    """
+    Fetch metadata from TMDB using an IMDb ID.
+    Returns: {"title": str, "year": int, "media_type": "movie"|"tv", "seasons": int}
+    """
+    if not TMDB_API_KEY:
+        log.error("  ❌ TMDB_API_KEY not set!")
+        return None
+
+    find_url = f"https://api.themoviedb.org/3/find/{imdb_id}?api_key={TMDB_API_KEY}&external_source=imdb_id"
+
+    try:
+        if aiohttp:
+            async with aiohttp.ClientSession() as session:
+                async with session.get(find_url, timeout=aiohttp.ClientTimeout(total=15)) as resp:
+                    if resp.status != 200:
+                        log.error(f"  ❌ TMDB /find error: HTTP {resp.status}")
+                        return None
+                    data = await resp.json()
+        else:
+            import requests as _req
+            r = _req.get(find_url, timeout=15)
+            if r.status_code != 200:
+                log.error(f"  ❌ TMDB /find error: HTTP {r.status_code}")
+                return None
+            data = r.json()
+    except Exception as e:
+        log.error(f"  ❌ TMDB fetch error: {e}")
+        return None
+
+    # Check movie results first, then TV
+    movie_results = data.get("movie_results", [])
+    tv_results = data.get("tv_results", [])
+
+    if movie_results:
+        m = movie_results[0]
+        title = m.get("title", "")
+        year_str = str(m.get("release_date", ""))[:4]
+        year = int(year_str) if year_str.isdigit() else 0
+        return {"title": title, "year": year, "media_type": "movie", "seasons": 0}
+
+    elif tv_results:
+        tv = tv_results[0]
+        title = tv.get("name", "")
+        year_str = str(tv.get("first_air_date", ""))[:4]
+        year = int(year_str) if year_str.isdigit() else 0
+        tmdb_id = tv.get("id")
+
+        # Fetch season count from /tv/{id}
+        seasons = 1
+        if tmdb_id:
+            try:
+                tv_url = f"https://api.themoviedb.org/3/tv/{tmdb_id}?api_key={TMDB_API_KEY}"
+                if aiohttp:
+                    async with aiohttp.ClientSession() as session:
+                        async with session.get(tv_url, timeout=aiohttp.ClientTimeout(total=15)) as resp:
+                            if resp.status == 200:
+                                tv_data = await resp.json()
+                                all_seasons = tv_data.get("seasons", [])
+                                # Filter out Season 0 (Specials)
+                                seasons = len([s for s in all_seasons if s.get("season_number", 0) > 0])
+                                if seasons == 0:
+                                    seasons = tv_data.get("number_of_seasons", 1)
+                else:
+                    import requests as _req
+                    r = _req.get(tv_url, timeout=15)
+                    if r.status_code == 200:
+                        tv_data = r.json()
+                        all_seasons = tv_data.get("seasons", [])
+                        seasons = len([s for s in all_seasons if s.get("season_number", 0) > 0])
+                        if seasons == 0:
+                            seasons = tv_data.get("number_of_seasons", 1)
+            except Exception as e:
+                log.warning(f"  ⚠️ Could not fetch season count: {e}. Defaulting to 1.")
+                seasons = 1
+
+        return {"title": title, "year": year, "media_type": "tv", "seasons": max(seasons, 1)}
+
+    else:
+        log.error(f"  ❌ TMDB: No results for IMDb ID '{imdb_id}'")
+        return None
+
+
+def _normalize_text(text: str) -> str:
+    """Lowercase, replace common separators with spaces, strip non-alphanum."""
+    if not text:
+        return ""
+    text = text.lower()
+    text = re.sub(r'[._\-\+]', ' ', text)   # separators → space
+    text = re.sub(r'[^a-z0-9\s]', '', text)  # strip special chars
+    text = re.sub(r'\s+', ' ', text).strip()
+    return text
+
+
+def verify_file_matches(text: str, expected_title: str, expected_year: int) -> bool:
+    """
+    Verify that a filename/caption matches the expected movie/series.
+    - Title: ≥70% token overlap required.
+    - Year: If a year is present in the file text, it must match ±1.
+    Returns True if the file is a plausible match.
+    """
+    if not text or not expected_title:
+        return False
+
+    norm_text = _normalize_text(text)
+    norm_title = _normalize_text(expected_title)
+
+    # Token overlap check
+    title_tokens = set(norm_title.split())
+    text_tokens = set(norm_text.split())
+
+    if not title_tokens:
+        return False
+
+    overlap = title_tokens & text_tokens
+    overlap_ratio = len(overlap) / len(title_tokens)
+
+    if overlap_ratio < 0.70:
+        log.info(f"  ⏭️ TITLE MISMATCH: '{expected_title}' vs file text (overlap: {overlap_ratio:.0%})")
+        return False
+
+    # Year check (±1 tolerance)
+    if expected_year and expected_year > 1900:
+        years_in_text = re.findall(r'\b((?:19|20)\d{2})\b', norm_text)
+        if years_in_text:
+            # Check if ANY extracted year is within ±1
+            year_match = any(abs(int(y) - expected_year) <= 1 for y in years_in_text)
+            if not year_match:
+                log.info(f"  ⏭️ YEAR MISMATCH: expected ~{expected_year}, found {years_in_text} in '{text[:60]}'")
+                return False
+
+    return True
+
+
+async def safe_click(message, **kwargs):
+    """Click a button with FloodWait and error handling."""
+    for attempt in range(3):
+        try:
+            result = await message.click(**kwargs)
+            return result
+        except errors.FloodWaitError as e:
+            w = e.seconds + random.uniform(5, 15)
+            log.warning(f"  ⚠️ FLOOD WAIT on button click: {w:.0f}s")
+            await asyncio.sleep(w)
+        except MessageNotModifiedError:
+            log.info("  ℹ️ Button click: message not modified (already processed)")
+            return True
+        except asyncio.TimeoutError:
+            log.warning(f"  ⚠️ Button click timeout (attempt {attempt+1}/3)")
+            if attempt < 2:
+                await asyncio.sleep(random.uniform(3, 6))
+        except Exception as e:
+            log.error(f"  ❌ Button click error (attempt {attempt+1}/3): {e}")
+            if attempt < 2:
+                await asyncio.sleep(random.uniform(5, 10))
+            else:
+                return None
+    return None
+
+
+def _find_button(message, text_fragment: str):
+    """
+    Find a button in the message's inline keyboard whose text contains
+    the given fragment (case-insensitive). Returns (row_idx, btn_idx) or None.
+    """
+    if not message.reply_markup:
+        return None
+    rows = message.reply_markup.rows if hasattr(message.reply_markup, 'rows') else []
+    fragment_lower = text_fragment.lower()
+    for r_idx, row in enumerate(rows):
+        for b_idx, btn in enumerate(row.buttons):
+            if fragment_lower in (btn.text or "").lower():
+                return (r_idx, b_idx)
+    return None
+
+
+async def findbatchid_scrape(imdb_id: str, event):
+    """
+    Core orchestration for /findbatchid.
+    Scrapes files from @Searchmovie4u_bot and forwards to @FlimfyBoxBot.
+    """
+    global _findbatch_running
+    if _findbatch_running:
+        await event.reply("⚠️ Another /findbatchid is already running. Please wait.")
+        return
+
+    _findbatch_running = True
+    total_forwarded = 0
+    status_msg = await event.reply(f"⏳ Fetching metadata for `{imdb_id}` from TMDB...")
+
+    try:
+        # ══════════════════════════════════════════════════
+        # PHASE 1: INITIALIZATION
+        # ══════════════════════════════════════════════════
+        meta = await fetch_tmdb_metadata(imdb_id)
+        if not meta:
+            await status_msg.edit(f"❌ TMDB: No data found for `{imdb_id}`. Check the IMDb ID.")
+            return
+
+        title = meta["title"]
+        year = meta["year"]
+        media_type = meta["media_type"]
+        seasons = meta["seasons"]
+
+        type_label = "🎬 Movie" if media_type == "movie" else f"📺 TV Show ({seasons} season{'s' if seasons > 1 else ''})"
+        await status_msg.edit(
+            f"✅ **Metadata Fetched!**\n\n"
+            f"🎬 **Title:** `{title}`\n"
+            f"📅 **Year:** {year}\n"
+            f"🏷️ **Type:** {type_label}\n\n"
+            f"⏳ Sending `/batchid {imdb_id}` to @{FLIMFYBOX_BOT}..."
+        )
+        log.info(f"  🎯 FindBatchID: {title} ({year}) — {type_label}")
+
+        # Resolve entities
+        try:
+            flimfy_bot = await client.get_entity(FLIMFYBOX_BOT)
+        except Exception as e:
+            await status_msg.edit(f"❌ Cannot resolve @{FLIMFYBOX_BOT}: {e}")
+            return
+
+        try:
+            target_bot = await client.get_entity(TARGET_BOT)
+        except Exception as e:
+            await status_msg.edit(f"❌ Cannot resolve @{TARGET_BOT}: {e}")
+            return
+
+        # Send /batchid to FlimfyBoxBot
+        await asyncio.sleep(random.uniform(SEARCH_MSG_DELAY_MIN, SEARCH_MSG_DELAY_MAX))
+        await safe_send_message(flimfy_bot, f"/batchid {imdb_id}")
+        log.info(f"  📤 Sent /batchid {imdb_id} to @{FLIMFYBOX_BOT}")
+        await asyncio.sleep(random.uniform(5, 8))  # Let FlimfyBoxBot process
+
+        # ══════════════════════════════════════════════════
+        # PHASE 2: SEASON LOOP
+        # ══════════════════════════════════════════════════
+        if media_type == "movie":
+            season_range = [0]  # Single iteration, no season tag
+        else:
+            season_range = list(range(1, seasons + 1))
+
+        for season_num in season_range:
+            if media_type == "movie":
+                search_query = f"{title} {year}" if year else title
+                season_label = "Movie"
+            else:
+                search_query = f"{title} s{season_num:02d}"
+                season_label = f"Season {season_num}"
+
+            log.info(f"\n  {'━'*50}")
+            log.info(f"  📡 {season_label}: Searching '{search_query}' on @{TARGET_BOT}")
+            log.info(f"  {'━'*50}")
+
+            await status_msg.edit(
+                f"📡 **{season_label}** — Searching on @{TARGET_BOT}...\n"
+                f"🔍 Query: `{search_query}`"
+            )
+
+            # ── Setup hybrid message queue ──
+            file_queue = asyncio.Queue()
+            _collector_active = True
+
+            @client.on(events.NewMessage(from_users=target_bot.id))
+            async def _file_collector(evt):
+                if _collector_active:
+                    await file_queue.put(evt.message)
+
+            # Send search query
+            await asyncio.sleep(random.uniform(SEARCH_MSG_DELAY_MIN, SEARCH_MSG_DELAY_MAX))
+            try:
+                await safe_send_message(target_bot, search_query)
+            except Exception as e:
+                log.error(f"  ❌ Failed to send search query: {e}")
+                client.remove_event_handler(_file_collector)
+                continue
+
+            # Wait for menu/response from target bot
+            menu_msg = None
+            try:
+                menu_msg = await asyncio.wait_for(file_queue.get(), timeout=30)
+                log.info(f"  📩 Got response from @{TARGET_BOT} (msg_id: {menu_msg.id})")
+            except asyncio.TimeoutError:
+                log.warning(f"  ⚠️ No response from @{TARGET_BOT} after 30s. Skipping {season_label}.")
+                _collector_active = False
+                client.remove_event_handler(_file_collector)
+                continue
+
+            # ── Drain any extra text/menu messages that arrived quickly ──
+            await asyncio.sleep(2)
+            latest_menu = menu_msg
+            while not file_queue.empty():
+                try:
+                    extra_msg = file_queue.get_nowait()
+                    # Keep the one with inline keyboard (it's the actual menu)
+                    if extra_msg.reply_markup:
+                        latest_menu = extra_msg
+                except asyncio.QueueEmpty:
+                    break
+            menu_msg = latest_menu
+
+            if not menu_msg.reply_markup:
+                log.warning(f"  ⚠️ Target bot response has no buttons. Skipping {season_label}.")
+                _collector_active = False
+                client.remove_event_handler(_file_collector)
+                continue
+
+            # ── PAGINATION LOOP ──
+            season_forwarded = 0
+            found_ep1 = False
+            page_num = 0
+            files_in_burst = 0
+            burst_size = random.randint(BATCH_MIN, BATCH_MAX)
+
+            while True:
+                page_num += 1
+                log.info(f"  📄 {season_label} — Page {page_num}: Clicking 'All Files'...")
+
+                # Find and click "All Files" button
+                all_files_pos = _find_button(menu_msg, "all files")
+                if not all_files_pos:
+                    # Try broader match
+                    all_files_pos = _find_button(menu_msg, "all")
+                if not all_files_pos:
+                    log.warning(f"  ⚠️ 'All Files' button not found. Trying first button...")
+                    # Click the first button as fallback
+                    all_files_pos = (0, 0)
+
+                await asyncio.sleep(random.uniform(BUTTON_CLICK_DELAY_MIN, BUTTON_CLICK_DELAY_MAX))
+                click_result = await safe_click(menu_msg, i=all_files_pos[0], j=all_files_pos[1])
+                if click_result is None:
+                    log.error(f"  ❌ Failed to click 'All Files'. Aborting {season_label}.")
+                    break
+
+                log.info(f"  ✅ Clicked 'All Files'. Waiting for files to drop...")
+
+                # ── Collect files with timeout ──
+                page_files = []
+                page_found_ep1 = False
+                consecutive_text_msgs = 0
+
+                while True:
+                    try:
+                        msg = await asyncio.wait_for(file_queue.get(), timeout=FILE_COLLECT_TIMEOUT)
+                    except asyncio.TimeoutError:
+                        log.info(f"  ⏱️ No new message for {FILE_COLLECT_TIMEOUT}s. Batch done.")
+                        break
+
+                    # Skip plain text messages (promos, ads, etc.)
+                    if not msg.media or not isinstance(msg.media, MessageMediaDocument):
+                        consecutive_text_msgs += 1
+                        if msg.reply_markup:
+                            # This might be a new menu/navigation message — save for later
+                            menu_msg = msg
+                            log.info(f"  📋 Got updated menu message (msg_id: {msg.id})")
+                        elif consecutive_text_msgs <= 3:
+                            log.info(f"  ⏭️ Skipping text message: '{(msg.text or '')[:50]}'")
+                        continue
+
+                    consecutive_text_msgs = 0
+
+                    # Check if it's a video file
+                    if not is_video_file(msg):
+                        fname = get_filename(msg)
+                        log.info(f"  ⏭️ Not a video file: {fname}")
+                        continue
+
+                    fname = get_filename(msg)
+                    caption = msg.text or msg.message or ""
+                    check_text = caption if caption else fname
+
+                    # Verify name & year match
+                    if not verify_file_matches(check_text, title, year):
+                        log.info(f"  ⏭️ VERIFICATION FAILED: {fname}")
+                        continue
+
+                    # ✅ Valid file — forward to FlimfyBoxBot
+                    page_files.append(msg)
+
+                    # Burst delay
+                    await asyncio.sleep(random.uniform(FILE_DELAY_MIN, FILE_DELAY_MAX))
+
+                    try:
+                        doc = msg.media.document
+                        fwd_caption = caption
+                        sent = await safe_send_file(flimfy_bot, file=doc, caption=fwd_caption, force_document=False)
+                        if sent:
+                            season_forwarded += 1
+                            total_forwarded += 1
+                            files_in_burst += 1
+                            fsize_mb = round(get_file_size(msg) / (1024*1024), 1)
+                            log.info(f"  ✅ [{total_forwarded}] Forwarded: {fname} ({fsize_mb}MB)")
+                        else:
+                            log.warning(f"  ❌ Forward failed: {fname}")
+                    except Exception as e:
+                        log.error(f"  ❌ Forward error for {fname}: {e}")
+
+                    # Burst batch pause
+                    if files_in_burst >= burst_size:
+                        pause_time = random.uniform(BATCH_PAUSE_MIN, BATCH_PAUSE_MAX)
+                        log.info(f"  🔄 Burst pause ({files_in_burst} files). Cooling {pause_time:.0f}s...")
+                        await asyncio.sleep(pause_time)
+                        files_in_burst = 0
+                        burst_size = random.randint(BATCH_MIN, BATCH_MAX)
+
+                    # Check for Episode 1
+                    if EPISODE_1_PATTERN.search(check_text):
+                        log.info(f"  🎯 EPISODE 1 DETECTED in: {fname}")
+                        page_found_ep1 = True
+
+                # End of file collection for this page
+                log.info(f"  📊 Page {page_num}: {len(page_files)} files forwarded")
+
+                if page_found_ep1:
+                    found_ep1 = True
+
+                # ── STOP or NEXT? ──
+                if found_ep1:
+                    log.info(f"  ✅ Episode 1 found! {season_label} is complete.")
+                    break
+
+                # Check for "Next" button
+                next_pos = _find_button(menu_msg, "next")
+                if not next_pos:
+                    next_pos = _find_button(menu_msg, "➡")
+                if not next_pos:
+                    log.info(f"  📌 No 'Next' button found. {season_label} is complete.")
+                    break
+
+                # Click "Next" and go to next page
+                log.info(f"  ➡️ Clicking 'Next' for page {page_num + 1}...")
+                await asyncio.sleep(random.uniform(BUTTON_CLICK_DELAY_MIN, BUTTON_CLICK_DELAY_MAX))
+                click_result = await safe_click(menu_msg, i=next_pos[0], j=next_pos[1])
+                if click_result is None:
+                    log.error(f"  ❌ Failed to click 'Next'. Ending {season_label}.")
+                    break
+
+                # After clicking Next, wait for updated menu or new messages
+                await asyncio.sleep(random.uniform(2, 4))
+
+                # The menu_msg might have been updated in-place or a new one sent
+                # Try to get a fresh menu message from the queue
+                try:
+                    fresh_msg = await asyncio.wait_for(file_queue.get(), timeout=10)
+                    if fresh_msg.reply_markup:
+                        menu_msg = fresh_msg
+                    else:
+                        # Put it back — it might be a file
+                        await file_queue.put(fresh_msg)
+                        # Re-fetch the original menu message to get updated buttons
+                        try:
+                            menu_msg = await client.get_messages(target_bot, ids=menu_msg.id)
+                        except:
+                            pass
+                except asyncio.TimeoutError:
+                    # Try re-fetching the menu message for updated buttons
+                    try:
+                        menu_msg = await client.get_messages(target_bot, ids=menu_msg.id)
+                    except:
+                        log.warning(f"  ⚠️ Could not refresh menu message. Ending {season_label}.")
+                        break
+
+            # ── End of pagination loop for this season ──
+            _collector_active = False
+            client.remove_event_handler(_file_collector)
+
+            log.info(f"  🎉 {season_label} done! {season_forwarded} files forwarded.")
+
+            # Update admin
+            await status_msg.edit(
+                f"✅ **{season_label} Complete!**\n"
+                f"📁 Files forwarded: {season_forwarded}\n"
+                f"📊 Total so far: {total_forwarded}"
+            )
+
+            # ── CLEANUP: Clear chat with target bot ──
+            log.info(f"  🧹 Clearing chat history with @{TARGET_BOT}...")
+            try:
+                msg_ids_to_delete = []
+                async for msg in client.iter_messages(target_bot, limit=200):
+                    msg_ids_to_delete.append(msg.id)
+                if msg_ids_to_delete:
+                    # Delete in batches of 100 (Telegram limit)
+                    for i in range(0, len(msg_ids_to_delete), 100):
+                        batch = msg_ids_to_delete[i:i+100]
+                        await client.delete_messages(target_bot, batch)
+                        await asyncio.sleep(1)
+                log.info(f"  ✅ Chat cleared ({len(msg_ids_to_delete)} messages deleted)")
+            except Exception as e:
+                log.warning(f"  ⚠️ Chat cleanup failed (non-critical): {e}")
+
+            # Inter-season cooldown
+            if season_num < season_range[-1]:
+                cooldown = random.uniform(SEASON_COOLDOWN_MIN, SEASON_COOLDOWN_MAX)
+                log.info(f"  💤 Season cooldown: {cooldown:.0f}s before next season...")
+                await asyncio.sleep(cooldown)
+
+        # ══════════════════════════════════════════════════
+        # PHASE 3: FINALIZATION
+        # ══════════════════════════════════════════════════
+        log.info(f"\n  📤 Sending /done to @{FLIMFYBOX_BOT}...")
+        await asyncio.sleep(random.uniform(SEARCH_MSG_DELAY_MIN, SEARCH_MSG_DELAY_MAX))
+        await safe_send_message(flimfy_bot, "/done")
+        log.info(f"  ✅ Sent /done to @{FLIMFYBOX_BOT}")
+
+        # Final report
+        final_report = (
+            f"🎉 **FindBatchID Complete!**\n\n"
+            f"🎬 **Title:** `{title}`\n"
+            f"📅 **Year:** {year}\n"
+            f"🏷️ **Type:** {type_label}\n\n"
+            f"📁 **Total Files Forwarded:** {total_forwarded}\n"
+            f"✅ `/done` sent to @{FLIMFYBOX_BOT}"
+        )
+        await status_msg.edit(final_report)
+        log.info(f"  🎉 FindBatchID COMPLETE: {total_forwarded} files forwarded for '{title}'")
+
+    except Exception as e:
+        log.error(f"  💥 FindBatchID error: {e}")
+        import traceback
+        traceback.print_exc()
+        try:
+            await status_msg.edit(f"❌ FindBatchID Error: {e}")
+        except:
+            pass
+    finally:
+        _findbatch_running = False
+
+
 def register_commands():
     @client.on(events.NewMessage(pattern=r'^/resume$', incoming=True))
     async def handle_resume(event):
@@ -458,6 +1020,28 @@ def register_commands():
                 f"Pending: {pending} | Processing: {processing} | Done: {done}")
         else:
             await event.reply(f"State: {status}\n❌ DB unavailable")
+
+    # ── /findbatchid Command ──
+    @client.on(events.NewMessage(pattern=r'^/findbatchid\s+(tt\d+)', incoming=True))
+    async def handle_findbatchid(event):
+        if OWNER_ID and event.sender_id != OWNER_ID:
+            return
+        imdb_id = event.pattern_match.group(1).strip()
+        log.info(f"  🎯 /findbatchid triggered: {imdb_id}")
+        # Run scraping in background so event handler returns quickly
+        asyncio.create_task(findbatchid_scrape(imdb_id, event))
+
+    # ── /stopfindbatch Command ──
+    @client.on(events.NewMessage(pattern=r'^/stopfindbatch$', incoming=True))
+    async def handle_stopfindbatch(event):
+        global _findbatch_running
+        if OWNER_ID and event.sender_id != OWNER_ID:
+            return
+        if _findbatch_running:
+            _findbatch_running = False
+            await event.reply("🛑 FindBatchID will stop after the current page completes.")
+        else:
+            await event.reply("ℹ️ No FindBatchID process is running.")
 
     log.info("  ✅ Owner commands registered")
 
