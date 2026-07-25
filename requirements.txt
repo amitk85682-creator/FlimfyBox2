@@ -35,3 +35,4 @@ httpx
 curl_cffi>=0.7.0
 python-dotenv
 playwright
+unidecode
