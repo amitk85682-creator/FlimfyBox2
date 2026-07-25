@@ -1022,7 +1022,7 @@ def register_commands():
             await event.reply(f"State: {status}\n❌ DB unavailable")
 
     # ── /findbatchid Command ──
-    @client.on(events.NewMessage(pattern=r'^/findbatchid\s+(tt\d+)', incoming=True))
+    @client.on(events.NewMessage(pattern=r'^/findbatchid\s+(tt\d+)', outgoing=True))
     async def handle_findbatchid(event):
         if OWNER_ID and event.sender_id != OWNER_ID:
             return
@@ -1032,7 +1032,7 @@ def register_commands():
         asyncio.create_task(findbatchid_scrape(imdb_id, event))
 
     # ── /stopfindbatch Command ──
-    @client.on(events.NewMessage(pattern=r'^/stopfindbatch$', incoming=True))
+    @client.on(events.NewMessage(pattern=r'^/stopfindbatch$', outgoing=True))
     async def handle_stopfindbatch(event):
         global _findbatch_running
         if OWNER_ID and event.sender_id != OWNER_ID:
