@@ -567,6 +567,16 @@ async def safe_fuzzy_click(message, target_text):
                 # Found the right button! Now click it with retry logic.
                 for attempt in range(3):
                     try:
+                        if hasattr(btn, 'url') and btn.url and 'start=' in btn.url:
+                            # It's a deep link, extract the start parameter
+                            match = re.search(r'start=([\w-]+)', btn.url)
+                            if match:
+                                start_param = match.group(1)
+                                log.info(f"  🔗 Deep link found in button, sending /start {start_param}")
+                                await message.client.send_message(message.chat_id, f"/start {start_param}")
+                                log.info(f"  ✅ Sent start command successfully.")
+                                return True
+                        
                         await btn.click()
                         log.info(f"  ✅ Click successful.")
                         return True
