@@ -3,6 +3,7 @@ T2T Userbot — Telegram-to-Telegram Channel Forwarder
 Forwards MKV/MP4 files from target channels to @FlimfyBoxBot PM.
 """
 import os, re, sys, random, asyncio, logging, json, unicodedata
+from unidecode import unidecode
 import socket
 from datetime import datetime, timedelta
 try:
@@ -526,6 +527,25 @@ def verify_file_matches(text: str, expected_title: str, expected_year: int) -> b
     return True
 
 
+def _is_real_menu(msg) -> bool:
+    """
+    Target bot sometimes sends promo/ad messages with buttons (e.g. 'AD# 18+
+    Exclusive Content') right after the real file menu. Those have buttons too,
+    so a plain 'first message with buttons' check picks the wrong one.
+    A real file-list menu has actionable buttons like 'All Files', 'Season',
+    'Quality', 'Next', or a file-size row (e.g. '285.48 MB ➜ ...').
+    """
+    if not msg.buttons:
+        return False
+    menu_markers = ("all files", "season", "quality", "language", "next", "mb ", "gb ", "browse")
+    for row in msg.buttons:
+        for btn in row:
+            text = unidecode(unicodedata.normalize('NFKC', btn.text or "")).lower()
+            if any(marker in text for marker in menu_markers):
+                return True
+    return False
+
+
 async def safe_fuzzy_click(message, target_text):
     """
     Manually iterates over buttons, normalizes fancy fonts, and clicks the target button safely.
@@ -535,9 +555,11 @@ async def safe_fuzzy_click(message, target_text):
         
     for row in message.buttons:
         for btn in row:
-            # Normalize fancy fonts (e.g. 𝗔𝗟𝗟 𝗙𝗜𝗟𝗘𝗦 -> all files)
+            # Normalize fancy fonts (e.g. 𝗔𝗟𝗟 𝗙𝗜𝗟𝗘𝗦 -> all files, Aʟʟ Fɪʟᴇs -> all files)
+            # NFKC alone doesn't fold IPA small-caps (ʟ, ɪ, ᴇ, ᴀ, etc.) to ASCII,
+            # so we also run unidecode which transliterates those to plain letters.
             raw_text = btn.text or ""
-            norm_text = unicodedata.normalize('NFKC', raw_text).lower()
+            norm_text = unidecode(unicodedata.normalize('NFKC', raw_text)).lower()
             log.info(f"  🔍 Checking button: '{norm_text}' (raw: '{raw_text}')")
             
             if target_text.lower() in norm_text:
@@ -673,13 +695,13 @@ async def findbatchid_scrape(imdb_id: str, event):
             await asyncio.sleep(4)
             
             menu_msg = None
-            async for msg in client.iter_messages(target_bot, limit=3):
-                if msg.buttons:
+            async for msg in client.iter_messages(target_bot, limit=5):
+                if _is_real_menu(msg):
                     menu_msg = msg
                     break
             
             if not menu_msg:
-                log.warning(f"  ⚠️ Target bot response has no buttons after 4s. Skipping {season_label}.")
+                log.warning(f"  ⚠️ Target bot response has no recognizable menu after 4s. Skipping {season_label}.")
                 _collector_active = False
                 client.remove_event_handler(_file_collector)
                 continue
@@ -827,8 +849,8 @@ async def findbatchid_scrape(imdb_id: str, event):
                 await asyncio.sleep(4)
                 
                 updated_menu = None
-                async for msg in client.iter_messages(target_bot, limit=3):
-                    if msg.buttons:
+                async for msg in client.iter_messages(target_bot, limit=5):
+                    if _is_real_menu(msg):
                         updated_menu = msg
                         break
                 
