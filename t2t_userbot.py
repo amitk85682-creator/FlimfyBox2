@@ -3,6 +3,7 @@ T2T Userbot — Telegram-to-Telegram Channel Forwarder
 Forwards MKV/MP4 files from target channels to @FlimfyBoxBot PM.
 """
 import os, re, sys, random, asyncio, logging, json, unicodedata
+import socket
 from datetime import datetime, timedelta
 try:
     from dotenv import load_dotenv
@@ -1041,6 +1042,9 @@ def register_commands():
     @client.on(events.NewMessage(pattern=r'^/stopfindbatch$', outgoing=True))
     async def handle_stopfindbatch(event):
         global _findbatch_running
+        
+        log.warning(f"🛑 /stopfindbatch triggered! Sender ID: {event.sender_id}, Chat ID: {event.chat_id}, Msg ID: {event.message.id}")
+        
         if OWNER_ID and event.sender_id != OWNER_ID:
             return
         if _findbatch_running:
@@ -1406,8 +1410,21 @@ async def safety_check():
 # Agar future mein chahiye toh Git history se restore karo.
 
 
+_lock_socket = None
+
+def enforce_single_instance():
+    global _lock_socket
+    _lock_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+    try:
+        _lock_socket.bind(("127.0.0.1", 45678))
+        log.info("✅ Single instance lock acquired on port 45678.")
+    except socket.error:
+        log.error("🛑 Another instance of T2T Userbot is already running. Exiting...")
+        sys.exit(0)
+
 # ── Entry Point ──
 async def start_t2t_worker():
+    enforce_single_instance()
     log.info("🤖 Starting T2T Userbot Worker...")
     await client.connect()
 
