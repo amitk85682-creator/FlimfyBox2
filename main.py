@@ -11598,14 +11598,19 @@ def run_telegram_bot(token, i):
         # OLD: run_auto_scraper_worker() — REMOVED (replaced by T2T Worker)
 
     logger.info(f"✅ Starting Polling for Bot {i+1}...")
-    try:
-        # Polling must run with stop_signals=None when inside a thread
-        app.run_polling(drop_pending_updates=True, stop_signals=None, close_loop=False)
-    except telegram.error.Conflict:
-        logger.critical(f"❌ BOT CONFLICT (Bot {i+1}): This token is already in use by another process!")
-        logger.critical("   💡 ADVICE: Kill all existing python processes ('pkill -9 python' or 'taskkill /f /im python.exe') and try again.")
-    except Exception as e:
-        logger.error(f"❌ Bot {i+1} polling error: {e}")
+    while True:
+        try:
+            # Polling must run with stop_signals=None when inside a thread
+            app.run_polling(drop_pending_updates=True, stop_signals=None, close_loop=False)
+            break
+        except telegram.error.Conflict:
+            logger.warning(f"⚠️ BOT CONFLICT (Bot {i+1}): Another instance is running (likely during Render deploy). Retrying in 10s...")
+            import time
+            time.sleep(10)
+        except Exception as e:
+            logger.error(f"❌ Bot {i+1} polling error: {e}")
+            import time
+            time.sleep(5)
 
 
 def main():
