@@ -661,35 +661,29 @@ async def findbatchid_scrape(imdb_id: str, event):
                 client.remove_event_handler(_file_collector)
                 continue
 
-            # Wait for menu/response from target bot
+            # Wait for menu/response from target bot to be sent and edited
+            await asyncio.sleep(4)
+            
             menu_msg = None
-            try:
-                menu_msg = await asyncio.wait_for(file_queue.get(), timeout=30)
-                log.info(f"  📩 Got response from @{TARGET_BOT} (msg_id: {menu_msg.id})")
-            except asyncio.TimeoutError:
-                log.warning(f"  ⚠️ No response from @{TARGET_BOT} after 30s. Skipping {season_label}.")
+            async for msg in client.iter_messages(target_bot, limit=3):
+                if msg.buttons:
+                    menu_msg = msg
+                    break
+            
+            if not menu_msg:
+                log.warning(f"  ⚠️ Target bot response has no buttons after 4s. Skipping {season_label}.")
                 _collector_active = False
                 client.remove_event_handler(_file_collector)
                 continue
-
-            # ── Drain any extra text/menu messages that arrived quickly ──
-            await asyncio.sleep(2)
-            latest_menu = menu_msg
+                
+            log.info(f"  📩 Got menu response from @{TARGET_BOT} (msg_id: {menu_msg.id})")
+            
+            # Clear out the file queue of the initial unedited text messages
             while not file_queue.empty():
                 try:
-                    extra_msg = file_queue.get_nowait()
-                    # Keep the one with inline keyboard (it's the actual menu)
-                    if extra_msg.reply_markup:
-                        latest_menu = extra_msg
+                    file_queue.get_nowait()
                 except asyncio.QueueEmpty:
                     break
-            menu_msg = latest_menu
-
-            if not menu_msg.reply_markup:
-                log.warning(f"  ⚠️ Target bot response has no buttons. Skipping {season_label}.")
-                _collector_active = False
-                client.remove_event_handler(_file_collector)
-                continue
 
             # ── PAGINATION LOOP ──
             season_forwarded = 0
@@ -821,30 +815,32 @@ async def findbatchid_scrape(imdb_id: str, event):
                     log.info(f"  📌 No 'Next' button found. {season_label} is complete.")
                     break
 
-                # After clicking Next, wait for updated menu or new messages
-                await asyncio.sleep(random.uniform(2, 4))
-
-                # The menu_msg might have been updated in-place or a new one sent
-                # Try to get a fresh menu message from the queue
-                try:
-                    fresh_msg = await asyncio.wait_for(file_queue.get(), timeout=10)
-                    if fresh_msg.reply_markup:
-                        menu_msg = fresh_msg
-                    else:
-                        # Put it back — it might be a file
-                        await file_queue.put(fresh_msg)
-                        # Re-fetch the original menu message to get updated buttons
-                        try:
-                            menu_msg = await client.get_messages(target_bot, ids=menu_msg.id)
-                        except:
-                            pass
-                except asyncio.TimeoutError:
-                    # Try re-fetching the menu message for updated buttons
-                    try:
-                        menu_msg = await client.get_messages(target_bot, ids=menu_msg.id)
-                    except:
-                        log.warning(f"  ⚠️ Could not refresh menu message. Ending {season_label}.")
+                # After clicking Next, wait for updated menu
+                await asyncio.sleep(4)
+                
+                updated_menu = None
+                async for msg in client.iter_messages(target_bot, limit=3):
+                    if msg.buttons:
+                        updated_menu = msg
                         break
+                
+                if updated_menu:
+                    menu_msg = updated_menu
+                else:
+                    log.warning(f"  ⚠️ Could not refresh menu message. Ending {season_label}.")
+                    break
+                
+                # Clear out the file queue of any intermediate text messages
+                temp_files = []
+                while not file_queue.empty():
+                    try:
+                        q_msg = file_queue.get_nowait()
+                        if q_msg.media and isinstance(q_msg.media, MessageMediaDocument):
+                            temp_files.append(q_msg)
+                    except asyncio.QueueEmpty:
+                        break
+                for f in temp_files:
+                    await file_queue.put(f)
 
             # ── End of pagination loop for this season ──
             _collector_active = False
