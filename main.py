@@ -1967,7 +1967,7 @@ def _get_movies_from_db_nocache(user_query, limit=10):
 
         matches = process.extract(user_query, movie_titles, scorer=fuzz.token_sort_ratio, limit=limit)
 
-        filtered_movies = [movie_dict[title] for title, score, index in matches if score >= 65]
+        filtered_movies = [movie_dict[title] for title, score in matches if score >= 65]
 
         logger.info(f"Found {len(filtered_movies)} fuzzy matches")
 
@@ -11167,6 +11167,10 @@ async def main_menu_or_search(update: Update, context: ContextTypes.DEFAULT_TYPE
 
     query_text = update.message.text.strip()
     
+    # === 0. GUARD: Ignore Bot-like / Userbot Status Messages ===
+    if "FindBatchID" in query_text or query_text.startswith("🛑") or query_text.startswith("ℹ️"):
+        return
+
     # === 2. Menu Button Logic ===
     if query_text == '🔍 Search Movies':
         msg = await update.message.reply_text("Great! Just type the name of the movie you want to search for.")
@@ -11233,6 +11237,10 @@ async def handle_group_message(update: Update, context: ContextTypes.DEFAULT_TYP
     
     text = update.message.text.strip()
     
+    # 0. GUARD: Ignore Bot-like / Userbot Status Messages
+    if "FindBatchID" in text or text.startswith("🛑") or text.startswith("ℹ️"):
+        return
+
     # 1. Commands ignore karo
     if text.startswith('/'):
         return
