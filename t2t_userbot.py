@@ -525,49 +525,36 @@ def verify_file_matches(text: str, expected_title: str, expected_year: int) -> b
     return True
 
 
-async def safe_click(message, **kwargs):
-    """Click a button with FloodWait and error handling."""
-    for attempt in range(3):
-        try:
-            result = await message.click(**kwargs)
-            return result
-        except errors.FloodWaitError as e:
-            w = e.seconds + random.uniform(5, 15)
-            log.warning(f"  ⚠️ FLOOD WAIT on button click: {w:.0f}s")
-            await asyncio.sleep(w)
-        except MessageNotModifiedError:
-            log.info("  ℹ️ Button click: message not modified (already processed)")
-            return True
-        except asyncio.TimeoutError:
-            log.warning(f"  ⚠️ Button click timeout (attempt {attempt+1}/3)")
-            if attempt < 2:
-                await asyncio.sleep(random.uniform(3, 6))
-        except Exception as e:
-            log.error(f"  ❌ Button click error (attempt {attempt+1}/3): {e}")
-            if attempt < 2:
-                await asyncio.sleep(random.uniform(5, 10))
-            else:
-                return None
-    return None
-
-
-def _find_button(message, text_fragment: str):
+async def safe_fuzzy_click(message, target_text):
     """
-    Find a button in the message's inline keyboard whose text contains
-    the given fragment (case-insensitive). Handles fancy Unicode fonts
-    (e.g., 𝗔𝗟𝗟 𝗙𝗜𝗟𝗘𝗦) by normalizing with NFKC first.
-    Returns (row_idx, btn_idx) or None.
+    Manually iterates over buttons, normalizes fancy fonts, and clicks the target button safely.
     """
-    if not message.reply_markup:
-        return None
-    rows = message.reply_markup.rows if hasattr(message.reply_markup, 'rows') else []
-    fragment_lower = text_fragment.lower()
-    for r_idx, row in enumerate(rows):
-        for b_idx, btn in enumerate(row.buttons):
-            btn_text = unicodedata.normalize('NFKC', btn.text or "").lower()
-            if fragment_lower in btn_text:
-                return (r_idx, b_idx)
-    return None
+    if not message.buttons:
+        return False
+        
+    for row in message.buttons:
+        for btn in row:
+            # Normalize fancy fonts (e.g. 𝗔𝗟𝗟 𝗙𝗜𝗟𝗘𝗦 -> all files)
+            norm_text = unicodedata.normalize('NFKC', btn.text).lower()
+            
+            if target_text.lower() in norm_text:
+                # Found the right button! Now click it with retry logic.
+                for attempt in range(3):
+                    try:
+                        await btn.click()
+                        return True
+                    except errors.FloodWaitError as e:
+                        await asyncio.sleep(e.seconds + random.uniform(3, 6))
+                    except errors.MessageNotModifiedError:
+                        return True  # Button already processed
+                    except Exception as e:
+                        if attempt < 2:
+                            await asyncio.sleep(random.uniform(2, 5))
+                        else:
+                            return False
+                return False
+                
+    return False # Button not found
 
 
 async def findbatchid_scrape(imdb_id: str, event):
@@ -636,6 +623,10 @@ async def findbatchid_scrape(imdb_id: str, event):
             season_range = list(range(1, seasons + 1))
 
         for season_num in season_range:
+            if not _findbatch_running:
+                log.info("  🛑 Scraping stopped by user before new season.")
+                break
+                
             if media_type == "movie":
                 search_query = f"{title} {year}" if year else title
                 season_label = "Movie"
@@ -708,22 +699,22 @@ async def findbatchid_scrape(imdb_id: str, event):
             burst_size = random.randint(BATCH_MIN, BATCH_MAX)
 
             while True:
+                if not _findbatch_running:
+                    log.info(f"  🛑 Scraping stopped by user before page {page_num + 1}.")
+                    break
+                    
                 page_num += 1
                 log.info(f"  📄 {season_label} — Page {page_num}: Clicking 'All Files'...")
 
                 # Find and click "All Files" button
-                all_files_pos = _find_button(menu_msg, "all files")
-                if not all_files_pos:
-                    # Try broader match
-                    all_files_pos = _find_button(menu_msg, "all")
-                if not all_files_pos:
-                    log.warning(f"  ⚠️ 'All Files' button not found. Trying first button...")
-                    # Click the first button as fallback
-                    all_files_pos = (0, 0)
-
                 await asyncio.sleep(random.uniform(BUTTON_CLICK_DELAY_MIN, BUTTON_CLICK_DELAY_MAX))
-                click_result = await safe_click(menu_msg, i=all_files_pos[0], j=all_files_pos[1])
-                if click_result is None:
+                click_result = await safe_fuzzy_click(menu_msg, "all files")
+                
+                if not click_result:
+                    # Try broader match
+                    click_result = await safe_fuzzy_click(menu_msg, "all")
+                    
+                if not click_result:
                     log.error(f"  ❌ Failed to click 'All Files'. Aborting {season_label}.")
                     break
 
@@ -735,6 +726,10 @@ async def findbatchid_scrape(imdb_id: str, event):
                 consecutive_text_msgs = 0
 
                 while True:
+                    if not _findbatch_running:
+                        log.info("  🛑 File collection stopped by user.")
+                        break
+                        
                     try:
                         msg = await asyncio.wait_for(file_queue.get(), timeout=FILE_COLLECT_TIMEOUT)
                     except asyncio.TimeoutError:
@@ -814,20 +809,16 @@ async def findbatchid_scrape(imdb_id: str, event):
                     log.info(f"  ✅ Episode 1 found! {season_label} is complete.")
                     break
 
-                # Check for "Next" button
-                next_pos = _find_button(menu_msg, "next")
-                if not next_pos:
-                    next_pos = _find_button(menu_msg, "➡")
-                if not next_pos:
-                    log.info(f"  📌 No 'Next' button found. {season_label} is complete.")
-                    break
-
-                # Click "Next" and go to next page
+                # Check for "Next" button and click it
                 log.info(f"  ➡️ Clicking 'Next' for page {page_num + 1}...")
                 await asyncio.sleep(random.uniform(BUTTON_CLICK_DELAY_MIN, BUTTON_CLICK_DELAY_MAX))
-                click_result = await safe_click(menu_msg, i=next_pos[0], j=next_pos[1])
-                if click_result is None:
-                    log.error(f"  ❌ Failed to click 'Next'. Ending {season_label}.")
+                
+                click_result = await safe_fuzzy_click(menu_msg, "next")
+                if not click_result:
+                    click_result = await safe_fuzzy_click(menu_msg, "➡")
+                    
+                if not click_result:
+                    log.info(f"  📌 No 'Next' button found. {season_label} is complete.")
                     break
 
                 # After clicking Next, wait for updated menu or new messages
@@ -898,17 +889,26 @@ async def findbatchid_scrape(imdb_id: str, event):
         await safe_send_message(flimfy_bot, "/done")
         log.info(f"  ✅ Sent /done to @{FLIMFYBOX_BOT}")
 
-        # Final report
-        final_report = (
-            f"🎉 **FindBatchID Complete!**\n\n"
-            f"🎬 **Title:** `{title}`\n"
-            f"📅 **Year:** {year}\n"
-            f"🏷️ **Type:** {type_label}\n\n"
-            f"📁 **Total Files Forwarded:** {total_forwarded}\n"
-            f"✅ `/done` sent to @{FLIMFYBOX_BOT}"
-        )
+        if not _findbatch_running:
+            final_report = (
+                f"🛑 **FindBatchID Stopped by Admin!**\n\n"
+                f"🎬 **Title:** `{title}`\n"
+                f"📁 **Files Forwarded Before Stop:** {total_forwarded}\n"
+                f"✅ `/done` sent to @{FLIMFYBOX_BOT} to close batch."
+            )
+        else:
+            # Final report
+            final_report = (
+                f"🎉 **FindBatchID Complete!**\n\n"
+                f"🎬 **Title:** `{title}`\n"
+                f"📅 **Year:** {year}\n"
+                f"🏷️ **Type:** {type_label}\n\n"
+                f"📁 **Total Files Forwarded:** {total_forwarded}\n"
+                f"✅ `/done` sent to @{FLIMFYBOX_BOT}"
+            )
+        
         await status_msg.edit(final_report)
-        log.info(f"  🎉 FindBatchID COMPLETE: {total_forwarded} files forwarded for '{title}'")
+        log.info(f"  🎉 FindBatchID END: {total_forwarded} files forwarded for '{title}'")
 
     except Exception as e:
         log.error(f"  💥 FindBatchID error: {e}")
