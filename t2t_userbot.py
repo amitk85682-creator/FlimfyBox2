@@ -535,19 +535,26 @@ async def safe_fuzzy_click(message, target_text):
     for row in message.buttons:
         for btn in row:
             # Normalize fancy fonts (e.g. 𝗔𝗟𝗟 𝗙𝗜𝗟𝗘𝗦 -> all files)
-            norm_text = unicodedata.normalize('NFKC', btn.text).lower()
+            raw_text = btn.text or ""
+            norm_text = unicodedata.normalize('NFKC', raw_text).lower()
+            log.info(f"  🔍 Checking button: '{norm_text}' (raw: '{raw_text}')")
             
             if target_text.lower() in norm_text:
+                log.info(f"  🎯 Match found for '{target_text}'! Clicking...")
                 # Found the right button! Now click it with retry logic.
                 for attempt in range(3):
                     try:
                         await btn.click()
+                        log.info(f"  ✅ Click successful.")
                         return True
                     except errors.FloodWaitError as e:
+                        log.warning(f"  ⚠️ FloodWait: {e.seconds}s")
                         await asyncio.sleep(e.seconds + random.uniform(3, 6))
                     except errors.MessageNotModifiedError:
+                        log.info("  ℹ️ Button click: message not modified")
                         return True  # Button already processed
                     except Exception as e:
+                        log.error(f"  ❌ Click error (attempt {attempt+1}/3): {e}")
                         if attempt < 2:
                             await asyncio.sleep(random.uniform(2, 5))
                         else:
