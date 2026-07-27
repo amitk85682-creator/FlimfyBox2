@@ -11168,7 +11168,11 @@ async def main_menu_or_search(update: Update, context: ContextTypes.DEFAULT_TYPE
     query_text = update.message.text.strip()
     
     # === 0. GUARD: Ignore Bot-like / Userbot Status Messages ===
-    if "FindBatchID" in query_text or query_text.startswith("🛑") or query_text.startswith("ℹ️"):
+    if "FindBatchID" in query_text or "Monitor Mode" in query_text or query_text.startswith("🛑") or query_text.startswith("ℹ️") or query_text.startswith("✅ **"):
+        return
+
+    # === 0.5 GUARD: Admin ke messages ko search mein mat bhejo jab batch active ho ===
+    if user_id == ADMIN_USER_ID and BATCH_SESSION.get('active'):
         return
 
     # === 2. Menu Button Logic ===
@@ -11238,7 +11242,7 @@ async def handle_group_message(update: Update, context: ContextTypes.DEFAULT_TYP
     text = update.message.text.strip()
     
     # 0. GUARD: Ignore Bot-like / Userbot Status Messages
-    if "FindBatchID" in text or text.startswith("🛑") or text.startswith("ℹ️"):
+    if "FindBatchID" in text or "Monitor Mode" in text or text.startswith("🛑") or text.startswith("ℹ️") or text.startswith("✅ **"):
         return
 
     # 1. Commands ignore karo
