@@ -1,0 +1,727 @@
+ó
+    *Hgj¡  ã            	       ór  • S r SSKrSSKrSSKrSSKrSSKrSSKrSSK r SSKrSSK	J	r	J
+r
+   SSK
+Jr  \" 5          SSKJrJrJr  SSKJrJrJr  SS KJr  SSKJr  SSKr\R:                  " \R<                  S
+SS
+9  \R>                  " S5      r \!" \RD                  RG                  SS5      5      r$\RD                  RG                  SS5      r%\!" \RD                  RG                  SS5      5      r&\RD                  RG                  SS5      r'Sr(Sr)Su  r*r+Su  r,r-Su  r.r/Sr0Sr1/ SQr21 Skr31 Skr4S r5S!q6S"q7Sq8S#r9S"q:S"q;Sq<Sq=\'(       d"  \" S$5        \" S%5        \R6                  " S
+5        \" \'5      r>\" \>\$\%S&S'S(S)9r?S* r@S+ rAS, rBS- rCSGS. jrDS/ rES0 rFS1 rGS2 rHS3 rIS4 rJS5 rKSHS6 jrLS7 rMS8 rNS9 rOS: rPS;\Q4S< jrRS= rSS> rTS? rUS@ rVSA rWSB rXSqYSC rZSD r[\\SE:X  a   \Rº                  " \[" 5       5        gg! \
+  a     GNÁf = f! \
+  a    \" S	5        \R6                  " S
+5         GNÇf = f! \^  a
+    \" SF5         gf = f)Iuy   
+T2T Userbot â€” Telegram-to-Telegram Channel Forwarder
+Forwards MKV/MP4 files from target channels to @FlimfyBoxBot PM.
+é    N)ÚdatetimeÚ	timedelta)Ú
+load_dotenv)ÚTelegramClientÚeventsÚerrors)ÚDocumentAttributeFilenameÚDocumentAttributeVideoÚMessageMediaDocument)Ú
+StringSession)ÚMessageNotModifiedErrorzpip install telethoné   z'%(asctime)s [%(levelname)s] %(message)sú%H:%M:%S)ÚlevelÚformatÚ datefmtÚT2TÚAPI_IDiø   ÚAPI_HASHÚ b18441a1ff607e10a989891a5462e627ÚOWNER_IDÚUSERBOT_SESSIONÚ ÚFlimfyBoxBoté  )r   é   )é
+   é   )é   é   éd   i    )ÚpromoÚ trailerÚsampleÚ1xbetÚ sponsor>   ú	video/aviú	video/mp4ú
+video/webmúvideo/quicktimeúvideo/x-msvideoúvideo/x-matroskaúapplication/x-matroskaúapplication/octet-stream>    ú.aviú.flvú.mkvú.movú.mp4ú.wmvú.webmé   g        FÚSearchmovie4u_botu'   
+âŒ USERBOT_SESSION not found in .env!z+   Pehle QR login karo: python qr_login.py
+Ú Desktopz
+Windows 11z4.14.9)Údevice_modelÚsystem_versionÚ
+app_versionc                 ó¨   • U R                  5       nUR                  S5        UR                  S5        U R                  5         UR                   5         g )NaX  
+        CREATE TABLE IF NOT EXISTS t2t_channels (
+            id SERIAL PRIMARY KEY,
+            channel_link TEXT NOT NULL UNIQUE,
+            channel_id BIGINT,
+            channel_title TEXT,
+            status TEXT DEFAULT 'pending',
+            priority INTEGER DEFAULT 0,
+            last_forwarded_msg_id INTEGER DEFAULT 0,
+            total_files_found INTEGER DEFAULT 0,
+            total_files_forwarded INTEGER DEFAULT 0,
+            added_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            started_at TIMESTAMP,
+            completed_at TIMESTAMP,
+            notes TEXT
+        );
+    a¸  
+        CREATE TABLE IF NOT EXISTS t2t_forward_log (
+            id SERIAL PRIMARY KEY,
+            channel_id INTEGER REFERENCES t2t_channels(id) ON DELETE CASCADE,
+            original_msg_id INTEGER NOT NULL,
+            filename TEXT,
+            file_size BIGINT,
+            forwarded_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            status TEXT DEFAULT 'forwarded',
+            UNIQUE(channel_id, original_msg_id)
+        );
+    )ÚcursorÚ executeÚcommitÚclose)ÚconnÚcurs     ÚDc:\Users\hp\Downloads\FlimfyBox1-main\FlimfyBox2-main\t2t_userbot.pyÚt2t_ensure_tablesrD   E   sE   € Ø
++‰+‹-€CØ ‡KKð ô 	ð" ‡KKð 
+ô 
+	ð 	‡KK„MØ ‡II…Kó    c                 ó€  • U R                  5       n UR                  SUR                  5       45        U R                   5         UR	                  5       nUR
+                  5         U(       a  US   $ S $ ! [          aB  nU R                  5         UR
+                  5         [        R                  SU 35         S nAg S nAff = f)NzfINSERT INTO t2t_channels (channel_link) VALUES (%s) ON CONFLICT (channel_link) DO NOTHING RETURNING idr   zAdd channel error: )
+r=   r>   Ústripr?   Úfetchoner@   Ú	ExceptionÚrollbackÚlogÚerror)rA   ÚlinkrB   ÚrÚes        rC   Út2t_add_channelrP   g   s¬   € Ø
++‰+‹-€Cð
+Ø
+
+‰
+Ð|ð  @D÷  @Jñ  @Jó  @Lð  Nô  	OØ
+‰
+Œ
+ØL‰L‹NˆØ
+	‰	Œ
+Þˆq‰tÐ"˜dÐ"øÜ
+ó Ø
+‰
+ŒØ
+	‰	Œ
+Ü
+	‰	Ð'¨ sÐ+Ô,Üûð	ús   ’AA1 Á/A1 Á1
+B=Á;8B8Â8B=c                 ó8  • U R                  5       nUR                  S5        UR                  5       nU(       a/  UR                   5         US   US   US   US   US   US    US   S	. $ [        R
+                  " 5       [
+        S
+S
+9-
+  nUR                  SU45        UR                  5       nUR                   5         U(       d  g US   n[        R                  S
+US   =(       d    US    SU S35        [        XSS S9  US   US   US   US   US   US    US   S	. $ )Nzò
+        SELECT id, channel_link, channel_id, channel_title, last_forwarded_msg_id,
+               total_files_found, total_files_forwarded
+        FROM t2t_channels WHERE status = 'pending'
+        ORDER BY priority DESC, id ASC LIMIT 1
+    r   r   r   é   é   r6   é   ) ÚidrM   Ú
+channel_idÚtitleÚ
+last_msg_idÚfoundÚ	forwardedé2   )Ú minutesa9  
+        SELECT id, channel_link, channel_id, channel_title, last_forwarded_msg_id,
+               total_files_found, total_files_forwarded
+        FROM t2t_channels
+        WHERE status = 'done'
+          AND completed_at IS NOT NULL
+          AND completed_at < %s
+        ORDER BY completed_at ASC LIMIT 1
+    u     ðŸ”„ Auto-Recheck: Channel 'z ' (ID: z,) was done >50min ago. Resetting to pending.Ú pending©ÚstatusÚcompleted_at)
+r=   r>   rH   r@   r   Úutcnowr   rK   ÚinfoÚt2t_update_channel)rA   rB   ÚrowÚfifty_mins_agoÚch_ids        rC   Út2t_fetch_next_channelrg   u   s7  € Ø
++‰+‹-€Cà ‡KKð ô 	ð 
+,‰,‹.€CÞ 
+Ø
+	‰	Œ
+Ø˜!‘f c¨!¡f¸CÀ¹FÈSÐQRÉVØ" 1™v°°A±ÀSÈÁVñMð 	Mô —_’_Ó&¬¸2Ñ)>Ñ>€NØ ‡KKð ð 
+Ð	ôð 
+,‰,‹.€CØ ‡II„KÞ
+Øð 
+‰F€EÜ ‡HHÐ-¨c°!©f×.>¸¸A¹Ð-?¸wÀuÀgÐMyÐ
+zÔ{Üt¨9À4ÒHàa‘& # a¡&¸¸A¹ÈÈQÉØ˜q™6¨C°©FÀÀQÁñIð IrE   c              
+   óT  • U R                  5       n/ n/ nUR                  5        H*  u  pgUR                  U S35        UR                  U 5        M,  
+   UR                  U5        UR                   SSR	                  U5       S3U5        U R
+                  5         UR
+                  5         g )Nz = %szUPDATE t2t_channels SET z, z WHERE id = %s) r=   ÚitemsÚappendr>   Újoinr?   r@   )rA   rf   ÚkwargsrB   ÚsetsÚvalsÚkÚvs           rC   rc   rc      s‡   € Ø
++‰+‹-€CØ
+
+€DØ
+
+€DØ—‘–‰ˆØ
+‰
+qc˜KÔ Ø
+‰
+AŽñ ð 	‡KKÔØ ‡KKÐ*¨4¯9©9°T«?Ð*;¸>ÐJÈDÔQØ‡KK„MØ ‡II…KrE   c                 ó  • U R                  5       n UR                  SXX4U45        U R                  5         UR                  5         g ! [          a2  n U R	                  5         [
+        R
+                  SU  35         S n A NHS n A ff = f)Nz¯INSERT INTO t2t_forward_log (channel_id, original_msg_id, filename, file_size, status)
+            VALUES (%s,%s,%s,%s,%s) ON CONFLICT (channel_id, original_msg_id) DO NOTHINGzLog forward error: )r=   r>   r?   rI   rJ   rK   rL   r@   )rA   rf   Úmsg_idÚfilenameÚ	file_sizer_   rB   rO   s           rC   Út2t_log_forwardru   ©   sv   € Ø
++‰+‹-€Cð -Ø
+
+‰
+ð \à
+˜H°Ð8ô	:ð 	
+
+‰
+Œ
+ð ‡II…Køô  ó -Ø
+‰
+ŒÜ
+	‰	Ð'¨ sÐ+×,Ñ,ûð-ús   ’%A Á
+BÁ(A?Á?Bc                 ó   • U R                  5       nUR                  SX45        UR                  5       nUR                   5         US L$ )NzHSELECT 1 FROM t2t_forward_log WHERE channel_id=%s AND original_msg_id=%s)r=   r>   rH   r@   )rA   rf   rr   rB   rN   s        rC   Út2t_is_already_forwardedrw   µ   s>   € Ø
++‰+‹-€CØ ‡KKÐZÐ]bÐ\kÔlØ
+‰‹€AØ ‡II„KØ
+Dˆ=ÐrE   c                 óˆ   • U R                  5       nUR                  S5        UR                  5       nUR                   5         U$ )NzzSELECT id, channel_link, channel_title, status, total_files_forwarded, last_forwarded_msg_id FROM t2t_channels ORDER BY id)r=   r>   Úfetchallr@   )rA   rB   Úrowss      rC   Út2t_get_all_channelsr{   ¼   s9   € Ø
++‰+‹-€CØ ‡KKð  Mô  NØ
+<‰<‹>€DØ ‡II„KØ
+€KrE   c                 óJ  ^• U R                   (       a  [        U R                   [        5      (       d  gU R                   R                  nU(       d  gUR                  =(       d    SR
+                  5       nU[        ;   a  gUR                  S5      (       a  gUR                   HT  n[        U[        5      (       d  M  UR                  R
+                  5       m[        U4S j[         5       5      (       d  MT    g
+   UR                   H  n[        U[        5      (       d  M    g
+   g)zGCheck: is this a video document with an allowed mime type or extension?Fr   Tzvideo/c              3   óF   >#   • U  H  nTR                  U5      v •  M  
+   g 7f©N)Úendswith)Ú.0ÚextÚnames     €rC   Ú	<genexpr>Ú is_video_file.<locals>.<genexpr>Ù   s   øé € ÐDÒ1C¨#4—=‘= ×%Ð%Ò1Cùs   ƒ!)ÚmediaÚ
+isinstancer
+   ÚdocumentÚ	mime_typeÚlowerÚALLOWED_MIME_TYPESÚ
+startswithÚ
+attributesr	   Ú	file_nameÚanyÚALLOWED_EXTENSIONSr
+   )Ú messageÚdocÚmimeÚattrr‚   s       @rC   Ú
+is_video_filer”   Ä   s×   ø€ à
+==¤
+¨7¯=©=Ô:N× OÑ OØØ
+-‰-×
+ Ñ
+ €CÞ
+ØØM‰M×˜R×
+&Ñ
+&Ó
+(€Dð Ô!Ó !Øð ‡x×  Ñ  Øð —”ˆÜ
+dÔ5×
+6Ó
+6Ø—>‘>×'Ñ'Ó)ˆDÜÔDÕ1CÓD×DÓDÙñ	 ð —”ˆÜ
+dÔ2×
+3Ó
+3Ùñ ð rE   c                 óf   ^• U (       d  gU R                  5       m[        U4S j[         5       5      $ )zECheck if any excluded keyword appears in the text (case-insensitive).Fc              3   ó,   >#   • U  H	  oT;   v •  M
+  
+   g 7fr~   © )r€   ÚkwÚ
+text_lowers     €rC   rƒ   Ú-_contains_excluded_keyword.<locals>.<genexpr>è   s   øé € Ð<Ò*; BZÖÒ*;ùs   ƒ)r‰   rŽ   ÚEXCLUDED_KEYWORDS)Útextr™   s    @rC   Ú_contains_excluded_keywordr   ã   s&   ø€ æ
+ØØ—‘“€JÜ
+Ô<Õ*;Ó<Ó
+<Ð<rE   c           
+      óÀ  • [        U 5      (       d¹  U R                  (       a§  [        U R                  [        5      (       aˆ  [	        U 5      n[
+        U 5      nSnU R                  R                  (       a)  U R                  R                  R                  =(       d    Sn[        R                  SU SU S[        US-
+  S5       S 3 5        g[
+        U 5      nU[        :  aJ  [	        U 5      nU(       a  [        US-
+  S	5      OS
+n[        R                  S
+U SU S
+[        S-   S 3 5        gUS:  aÄ  SnU R                  (       a„  [        U R                  [        5      (       ae  U R                  R                  (       aJ  U R                  R                  R                   H&  n[        U[        5      (       d  M  UR                  n  O
+   Ub  US:  a$  [	        U 5      n[        R                  SU 35        g[	        U 5      nU R                  =(       d    U R                   =(       d    Sn [#        U5      (       d  [#        U 5      (       a  [        R                  SU 35        gg)zÈ
+STRICT full-movie filter. Returns True ONLY if ALL conditions pass:
+  1. Valid video mime type or extension
+  2. File size >= MIN_FILE_SIZE
+  3. Filename and caption do NOT contain excluded keywords
+r   u"     â­ï¸ SKIP (not video format): z	 | mime: z	 | size: é   r   ÚMBFr   r   u     â­ï¸ SKIP (too small): ú | zMB < i  @Ni,  uC     â­ï¸ Skipped: File under 100MB and duration < 5m (or unknown): u2     â­ï¸ SKIP (excluded keyword in name/caption): T)r”   r…   r†   r
+   Úget_filenameÚ
+get_file_sizer‡   rˆ   rK   rb   ÚroundÚ
+MIN_FILE_SIZErŒ   r
+   Údurationrœ   r   r   )r   ÚfnameÚfsizer’   Ú size_mbr¦   r“   Ú captions           rC   Ú
+is_full_movier«   ê   sí  € ô ˜×
+!Ñ
+!à
+==œZ¨ ¯
+©
+Ô7K×LÑLÜ  Ó)ˆEÜ! 'Ó*ˆEØˆDØ}‰}×%×%Ø—}‘}×-Ñ-×7Ñ7×=¸2ÜH‰HÐ9¸%¸À	È$ÈÈyÔY^Ð_dÐfoÑ_pÐrsÓYtÐXuÐuwÐxÔyØô 
+˜'Ó"€EØ Œ}Ó Ü˜WÓ%ˆÞ38”%˜ Ñ+¨QÔ/¸aˆ Ü
+‰Ð.¨u¨g°S¸¸	ÀÄ}ÐW`ÑGaÐFbÐbdÐeÔfØð 
+Ð Ó  ØˆØ
+==œZ¨ ¯
+©
+Ô7K×LÑLÐQX×Q^ÑQ^×Qg×QgØŸ
+™
+×.Ñ.×9Ô9Ü˜dÔ$:×;Ó;Ø#Ÿ}™}HÙñ  :ð
+ Ñ
+˜x¨#›~Ü  Ó)ˆEÜH‰HÐZÐ[`ÐZaÐbÔcØô 
+˜Ó!€EØl‰l×3˜gŸo™o×3°€GÜ ! %× (Ñ (Ô,FÀw×,OÑ,OÜ
+‰ÐEÀeÀWÐMÔNØà
+rE   c                 ó
+  • U R                   (       ar  [        U R                   [        5      (       aS  U R                   R                  nU(       a6  UR                   H&  n[        U[
+        5      (       d  M  UR                  s  $ 
+   g)NÚ unknown) r…   r†   r
+   r‡   rŒ   r	   r   )r   r‘   r“   s      rC   r¢   r¢     sW   € Ø ‡}‡}œ G§M¡MÔ3G×HÑHØm‰m×$Ñ$ˆÞ
+ØŸœÜ˜dÔ$=×>Ó>ØŸ>™>Ò)ñ 'ð rE   c                 óØ   • U R                   (       aY  [        U R                   [        5      (       a:  U R                   R                  nU(       a  UR                  (       a  UR                  $ g)Nr   )r…   r†   r
+   r‡   Úsize)r   r‘   s     rC   r£   r£   %  s>   € Ø ‡}‡}œ G§M¡MÔ3G×HÑHØm‰m×$Ñ$ˆÞ
+3—8—8Ø—8‘8ˆOØ
+rE   c               ƒ   óÒ   #   • [         R                  " [        [        5      nU (       a  [        R
+                  SU  SUS S35        [        R                  " U5      I S h  v•N   g  N7f)Nu      ðŸ• u    â€” z.1fz	s wait...)ÚrandomÚ uniformÚFILE_DELAY_MINÚFILE_DELAY_MAXrK   rb   Ú asyncioÚsleep)ÚlabelÚds     rC   Ú
+human_delayr¹   ,  sG   é € ÜŠ”~¤~Ó6€AÞ Ü
+‰7˜5˜'  q¨ g¨YÐ7Ô8Ü
+-Š-˜Ó
+×Óùs   ‚AA'ÁA%Á A'c              ‹   ó‚  #   • [         R                  " 5       R                  5       nU[        -
+  nU[        :  a?  [        U-
+  [
+        R                  " SS5      -   n[         R                  " U5      I S h  v•N   [        S5       HH  n [        R                  " X40 UD6I S h  v•N n [         R                  " 5       R                  5       qU s  $ 
+   g  N\ N0! [        R                    ag  nUR                  [
+        R                  " SS5      -   n[        R!                  SU S 35        [         R                  " U5      I S h  v•N     S nAMÇ  S nAf["          ae  n[        R%                  SUS-    S	U 35        US
+:  a;  [         R                  " [
+        R                  " S
+S5      5      I S h  v•N     S nAGM3  e S nAff = f7f)
+Nr   rS   rR   r6   r   u     âš ï¸ FLOOD WAIT: Úsu     âŒ Send error (ú/3): r   r   r   )rµ   Úget_event_loopÚtimeÚ_last_msg_timeÚ
+MIN_MSG_GAPr±   r²   r¶   ÚrangeÚclientÚsend_messager   ÚFloodWaitErrorÚ secondsÚ randintrK   Ú warningrI   rL   )	Úentityrœ   rl   ÚnowÚ elapsedÚwÚ attemptÚresultrO   s	            rC   Úsafe_send_messagerÎ   2  sZ  é € ä
+×
+ Ò
+ Ó
+"×
+'Ñ
+'Ó
+)€CØ”NÑ"€GØ ”Ó Ü˜'Ñ!¤F§N¢N°1°aÓ$8Ñ8ˆÜmŠm˜AÓ×ÐÜ˜–8ˆ ð
+	Ü!×.Ò.¨vÑF¸vÑF×FˆFÜ$×3Ò3Ó5×:Ñ:Ó<ˆNØŠMñ	 ð ñ! 	ñ Gøô ×$Ñ$ó 	#Ø—	‘	œFŸNšN¨1¨bÓ1Ñ1ˆAÜK‰KÐ/°¨s°!Ð4Ô5Ü—-’- Ó"×"×"ûÜó 	ÜI‰IÐ*¨7°1©9¨+°U¸1¸#Ð>Ô?Ø˜‹{Ü—m’m¤F§N¢N°2°rÓ$:Ó;×;×;Ð;àûð
+	üs€   ‚A1F?Á3CÁ4F?Â CÂ!CÂ"(CÃ
+ F?ÃCÃF<Ã(AE
+Ä>EÄ?E
+ÅF?Å
+
+F<ÅAF7Æ)F,Æ*F7Æ/ F?Æ6F7Æ7F<Æ<F?c              ‹   óX  #   • [        S5       H%  n [        R                  " X40 UD6I Sh  v•N nUs  $ 
+   g N
+! [        R                    ag  nUR
+                  [        R                  " SS5      -   n[        R                  SU S35        [        R                  " U5      I Sh  v•N     SnAM¢  SnAf[          aj  n[        R                  S US-    S	U 35        US
+:  a;  [        R                  " [        R                  " SS
+5      5      I Sh  v•N     SnAGM   SnA  gSnAff = f7f)u;   Send file WITHOUT the heavy MIN_MSG_GAP â€” burst-friendly.rR   Nr6   r   u"     âš ï¸ FLOOD WAIT on send_file: r»   u     âŒ send_file error (r   r¼   r   r   )rÁ   rÂ   Ú	send_filer   rÄ   rÅ   r±   rÆ   rK   rÇ   rµ   r¶   rI   rL   r²   ) rÈ   Úfilerl   rÌ   rÍ   rO   rË   s           rC   Úsafe_send_filerÒ   J  sç   é € ä˜–8ˆ ð	Ü!×+Ò+¨FÑC¸FÑC×CˆFØŠMñ  ð ñ Døä×$Ñ$ó 	#Ø—	‘	œFŸNšN¨1¨bÓ1Ñ1ˆAÜK‰KÐ<¸Q¸C¸qÐAÔBÜ—-’- Ó"×"×"ûÜó 	ÜI‰IÐ/° ¸±	¨{¸%À¸sÐCÔDØ˜‹{Ü—m’m¤F§N¢N°1°bÓ$9Ó:×:×:Ð:åûð
+	üsc   ‚D*’:¬8­:²D*¸:ºD'ÁAB0Â$B'Â%B0Â*D*Â0
+D'Â=AD"ÄDÄD"Ä
+D*Ä"D'Ä'D*c              ƒ   ó¸   #   • [         R                  SU  35        Sq[        (       a(   [        R
+                  [        SU  S35      I S h  v•N   g g  N!    g = f7f)Nu   ðŸ›‘ PAUSE: Tu&   ðŸ›‘ **T2T Bot Paused!**
+**Reason:** `z`
+Send `/resume` to continue.)rK   rL   Ú	is_pausedr   rÂ   rÃ   )Úreasons    rC   Ú
+trigger_pauserÖ   ]  sb   é € ä ‡II˜V˜HÐ%Ô&Ø€Iß ‚xð	Ü×%Ñ%¤hØ9¸&¸ÐA_Ð`ób÷ 
+bñ 
+bð ñ
+bøà‘üs.   ‚&A©!A Á
+AÁ
+A ÁAÁA ÁAÁAc               ƒ   ó  #   • [         (       d  g [        c  [        R                  " 5       q[        R	                  5         [
+        R
+                  S5        [        R                  5       I S h  v•N   [
+        R
+                  S5        g  N7f)Nu     â¸ï¸ Waiting for /resume...u     â–¶ï¸ Resumed!)rÔ   Ú
+_resume_eventrµ   ÚEventÚclearrK   rb   Úwaitr—   rE   rC   Úwait_for_resumerÜ   g  s[   é € ç
+Š9ØÜ Ñ ÜŸ
+š
+›ˆ
+Ü×ÑÔÜ ‡HHÐ
+.Ô/Ü
+×
+Ñ
+Ó
+×ÐÜ ‡HHÐ
+ Õ!ñ ùs   ‚A)BÁ+BÁ,BÚ imdb_idc           
+   ƒ   óð  ^#   • [         (       a  UR                  S5      I Sh  v•N   gSqSq Sq [        R
+                  [        5      I Sh  v•N m[        R
+                  [        5      I Sh  v•N n[        TS U  35      I Sh  v•N   [        R                  SU  S	[         35        [        R                  [        R                  " UR                  S
+95      U4S
+ j5       nUqUR                  SU  S
+[         S[         S[         S3	5      I Sh  v•N   [        R                  S[         35        g GN Né NÊ! [          a+  nUR                  SU 35      I Sh  v•N    Sq Sq SnAgSnAff = f Ní Nb7f)u³   
+Start monitor mode:
+1. Send /batchid <imdb_id> to FlimfyBoxBot
+2. Register a NewMessage handler on @Searchmovie4u_bot
+3. Any media file from that bot â†’ forward to FlimfyBoxBot
+u8   âš ï¸ Monitor already active! Use /stopfindbatch first.NTr   u   âŒ Bot resolve failed: Fz	/batchid u     ðŸ“¤ Sent /batchid z to @)Ú
+from_usersc           	   “   ó’  >#   • [         (       d  g U R                  nUR                  (       a  [         UR                  [        5      (       d  g [
+        U5      (       d  g [
+        U5      n[        U5      nU[        :  a*  [        R                  SU S[        US-
+  S5       S35        g  UR                  R                  nUR                  =(       d    UR                  =(       d    Sn[        R                  " [         R"                  " [$        [&        5      5      I S h  v•N   [)        T	XES S9I S h  v•N nU(       a<  [*        S-
+  q[        US-
+  S5      n [        R                  S	[*         S
+U SU  S3 5        g [        R-                  S
+U 35        g  Ns Nb! [.          a%  n[        R1                  SU S
+U 35         S nAg S nAff = f7f)Nu     â­ï¸ Skip (too small): ú (rŸ   r   zMB)r   F©rÑ   rª   Úforce_documentu      âœ… [z
+] Forwarded: u     âŒ Forward failed: u     âŒ Forward error: ú: )Ú_monitor_activer   r…   r†   r
+   r”   r¢   r£   r¥   rK   rb   r¤   r‡   rœ   rµ   r¶   r±   r²   r³   r´   rÒ   Ú_monitor_forwardedrÇ   rI   rL   )
+ÚevtÚmsgr§   r¨   r‘   rª   Úsentr©   rO   Ú
+flimfy_bots
+            €rC   Ú_monitor_file_handlerÚ6findbatch_start_monitor.<locals>._monitor_file_handler—  sz  øé € ÷ ŠØàk‰kˆð yy¤
+¨3¯9©9Ô6J× KÑ KØô ˜S×!Ñ!Øä˜SÓ!ˆÜ˜cÓ"ˆð ”=Ó
+ ÜH‰HÐ2°5°'¸¼EÀ%ÈÑBSÐTUÓ<VÐ;WÐWZÐ[Ô\Øð	<Ø—)‘)×$Ñ$ˆCØ—h‘h×3 #§+¡+×3°ˆGÜ—-’-¤§¢¬~¼~Ó NÓO×OÐOÜ'¨
+¸Ð^cÑd×dˆDÞÜ" aÑ'Ð"Ü ¨Ñ 5°qÓ9 Ü—‘˜7Ô#5Ð"6°mÀEÀ7È"ÈWÈIÐUXÐYÕZä—
+‘
+Ð4°U°GÐ<Õ=ñ 
+PÙdøô ó 	<ÜI‰IÐ-¨e¨W°B°q°cÐ:×;Ñ;ûð	<üsb   ƒB%G Â)A4F ÄFÄF Ä0FÄ1AF Å7G Å8F ÆG ÆF ÆF Æ
+GÆF?Æ:G Æ?GÇG u)   âœ… **Monitor Mode ON!**
+
+ðŸ“¤ `/batchid z
+` sent to @u   
+ðŸ‘ï¸ Now watching @u$    for files
+
+ðŸ“Œ **Ab tum manually @u•    mein jao, movie search karo, buttons click karo.**
+Jaise hi files aayengi, main unhe auto forward kar dunga!
+
+ðŸ›‘ Jab sab ho jaye: `/stopfindbatch`u,     ðŸ‘ï¸ Monitor Mode ACTIVE â€” watching @)rå   ÚreplyÚ_findbatch_runningræ   rÂ   Ú
+get_entityÚ
+FLIMFYBOX_BOTÚ
+TARGET_BOTrI   rÎ   rK   rb   Úonr    Ú
+NewMessagerU   Ú_monitor_handler)rÝ   ÚeventÚ
+target_botrO   rë   rê   s        @rC   Úfindbatch_start_monitorr÷   w  ss  øé € ÷ ‚Øk‰kÐTÓU×UÐUØàÐØ€OØÐð Ü!×,Ñ,¬]Ó;×;ˆ
+Ü!×,Ñ,¬ZÓ8×8ˆ
+ô 
+˜J¨)°G°9Ð(=Ó
+>×>Ð>Ü ‡HHÐ$ W I¨U´=°/Ð
+BÔCô ‡YYŒv× Ò ¨J¯M©MÑ:Ó;ô%<ó <ð%<ðN -Ðà
++‰+ð
+Ø!˜ +¬m¨_ð =!Ü!+ ð -#Ü#- ,ð /1ð 	2ó 
+÷  ð  ô ‡HHÐ;¼J¸<Ð
+HÕIòQ 	Vñ <Ù8øÜ
+ó Øk‰kÐ4°Q°CÐ8Ó9×9Ñ9ØˆØ"ÐÜûð	úñ ?ñ\ ùs‡   ƒ E6£D3¤
+E6°D: ÁD6Á
+ D: Á-D8Á.D: Á2E6ÂE2ÂBE6ÄE4Ä"E6Ä6D: Ä8D: Ä:
+E/ÅE*ÅEÅ	E*Å%E6Å*E/Å/E6Å4E6c               ƒ   óF  #   • [         (       d  U R                  S5      I Sh  v•N   gSq Sq[        (       a  [        R
+                  [        5        Sq [        R
+                  [        5      I Sh  v•N n[        US5      I Sh  v•N   [        R                  S[         35        U R                  S [         S[         S	35      I Sh  v•N   [        R                  S
+[         S
+35        g NÇ N| Nj! [          a"  n[        R                  SU 35         SnANsSnAff = f NW7f)z1Stop monitor mode and send /done to FlimfyBoxBot.u"   â„¹ï¸ Monitor mode is not active.NFz/doneu     ðŸ“¤ Sent /done to @u     âŒ Failed to send /done: u6   ðŸ›‘ **Monitor Mode OFF!**
+
+ðŸ“ **Files Forwarded:** u   
+âœ… `/done` sent to @z>
+
+Batch close ho gaya. Ab tum FlimfyBoxBot mein dekh sakte ho.u     ðŸ›‘ Monitor stopped. z files forwarded.)rå   rí   rî   rô   rÂ   Úremove_event_handlerrï   rð   rÎ   rK   rb   rI   rL   ræ   )rõ   rê   rO   s      rC   Úfindbatch_stop_monitorrú   Ì  s  é € ÷ Š?Øk‰kÐ>Ó?×?Ð?Øà€OØÐ÷ Ò Ü×#Ñ#Ô$4Ô5ØÐð6Ü!×,Ñ,¬]Ó;×;ˆ
+Ü 
+¨GÓ4×4Ð4Ü
+‰Ð)¬-¨Ð9Ô:ð 
++‰+ð
+%Ü%7Ð$8ð 9 Ü -˜ð /Gð	Hó
+÷ ð ô ‡HHÐ'Ô(:Ð';Ð;LÐ
+MÕNñ3 	@ñ <Ù4øä
+ó 6Ü
+	‰	Ð0°°Ð4×5Ñ5ûð6úñùsi   ‚ D!¢C*£/D!ÁC0 Á/C,Á0C0 ÂC.Â C0 Â$#D!Ã DÃ#D!Ã,C0 Ã.C0 Ã0
+DÃ:DÄD!ÄDÄD!c                   ó  • [         R                  [        R                  " SSS95      S 5       n [         R                  [        R                  " SSS95      S 5       n[         R                  [        R                  " S SS95      S 5       n[         R                  [        R                  " S	SS95      S
+ 5       n[         R                  [        R                  " S
+SS95      S 5       n[         R                  [        R                  " S
+SS95      S 5       n[         R                  [        R                  " SSS95      S 5       n[         R                  [        R                  " SSS95      S 5       n [        R
+                  S5        g )Nz	^/resume$T)Ú patternÚincomingc              “   ó  #   • [         (       a  U R                  [         :w  a  g [        (       d  U R                   S5      I S h  v•N   g SqU R                   S5      I S h  v•N   [        (       a  [        R
+                  5         g g  NA N'7f)Nu   âœ… Bot is not paused.Fu   â–¶ï¸ **Resumed!**)r   Ú	sender_idrÔ   rí   rØ   Úset©rõ   s    rC   Ú
+handle_resumeÚ(register_commands.<locals>.handle_resumeî  sm   é € ÷ Š8˜Ÿ™¬8Ó3ØßŠyØ—+‘+Ð6Ó7×7Ð7ØØˆ	Øk‰kÐ/Ó0×0Ð0ß
+Š=Ü×ÑÕð ñ	 
+8ñ 	1ùs$   ‚A BÁBÁBÁBÁ&BÂBz^/pause$c              “   ó¬   #   • [         (       a  U R                  [         :w  a  g [        S5      I S h  v•N   U R                   S5      I S h  v•N   g  N N 7f)NzManual pause by owneru   â¸ï¸ Bot paused.)r   rÿ   rÖ   rí   r  s    rC   Úhandle_pauseÚ'register_commands.<locals>.handle_pauseû  sB   é € ç
+Š8˜Ÿ™¬8Ó3ØÜÐ3Ó4×4Ð4Øk‰kÐ.Ó/×/Ñ/ñ 	5Ù/ùs!   ‚/A±A²AÁ
+AÁ
+AÁAz^/addchannel\s+(.+)c               “   óø  #   • [         (       a  U R                  [         :w  a  g U R                  R                   S5      R	                  5       n[
+        R                  " 5       nU(       d  U R                  S5      I S h  v•N   g [        U5        [        X!5      n[
+        R                  " U5        U(       a!  U R                  SU SU S35      I S h  v•N   g U R                  SU S35      I S h  v•N   g  Nw N% N	7f) Nr   u   âŒ DB connection failedu   âœ… Channel added (ID: z)
+`Ú`u)   âš ï¸ Channel already exists or error.
+`)
+r   rÿ   Ú
+pattern_matchÚgrouprG   Údb_utilsÚget_db_connectionrí   rD   rP   Úclose_db_connection)rõ   rM   rA   Úcids       rC   Úhandle_addchannelÚ,register_commands.<locals>.handle_addchannel  sÎ   é € ç
+Š8˜Ÿ™¬8Ó3ØØ×"Ñ"×(Ñ(¨Ó+×1Ñ1Ó3ˆÜ×)Ò)Ó+ˆÞØ—+‘+Ð8Ó9×9Ð9ØÜ˜$ÔÜ˜dÓ)ˆÜ×$Ò$ TÔ*Þ
+Ø—+‘+Ð 7¸°u¸DÀÀÀaÐHÓI×IÑIà—+‘+Ð JÈ4È&ÐPQÐRÓS×SÑSñ 
+:ñ 
+JáSùs7   ‚A:C:Á<C4Á=AC:ÃC6ÃC:Ã.C8Ã/C:Ã6C:Ã8C:z
+^/channels$c              “   óf  #   • [         (       a  U R                  [         :w  a  g [        R                  " 5       nU(       d  U R	                  S5      I S h  v•N   g [
+        U5        [
+        U5      n[        R                  " U5        U(       d  U R	                  S5      I S h  v•N   g SSSSS S.nS	/nU HK  nUu  pgp‰p«UR                  U	S
+5      nU=(       d    U S S
+ n
+UR                  U SU S
+U
+ SU	 SU
+ SU
+ 3
+5        MM  
+   U R	                  SR                  U5      5      I S h  v•N   g  N× NŒ N	7f)Nõ   âŒ DB erroru4   ðŸ“­ No channels added yet.
+Use `/addchannel <link>`u   â³u   ðŸ”„u   âœ…u   âŒu   â¸ï¸)r]   Ú
+processingÚdoneÚfailedÚpausedu   ðŸ“‹ **T2T Channels:**
+u   â“r    z `z` | **z** | r¡   z files | last_msg: Ú
+)
+r   rÿ   r
+  r  rí   rD   r{   r
+  Úgetrj   rk   )rõ   rA   rz   ÚiconsÚlinesrN   r  rM   rW   r_   ÚfwdÚ last_idÚiconr‚   s                 rC   Úhandle_channelsÚ*register_commands.<locals>.handle_channels  s&  é € ç
+Š8˜Ÿ™¬8Ó3ØÜ×)Ò)Ó+ˆÞØ—+‘+˜nÓ-×-Ð-ØÜ˜$ÔÜ# DÓ)ˆÜ×$Ò$ TÔ*ÞØ—+‘+ÐUÓV×VÐVØØ!°ÀÐRWÐckÑlˆØ+Ð,ˆÛˆAØ56Ñ2ˆCu cØ—9‘9˜V UÓ+ˆDØ×%˜D  "˜IˆDØL‰L˜D˜6  C 5¨¨t¨f°E¸&¸ÀÀSÀEÐI\Ð]dÐ\eÐfÖgñ	 ð
+ k‰k˜$Ÿ)™) EÓ*Ó+×+Ñ+ñ 
+.ñ 
+Wñ 	,ùs8   ‚AD1ÁD+ÁAD1Â D-Â!BD1Ä%D/Ä&D1Ä-D1Ä/D1z^/skipchannel$c               “   óæ  #   • [         (       a  U R                  [         :w  a  g [        R                  " 5       nU(       d  U R	                  S5      I S h  v•N   g [
+        U5      nU(       d0  U R	                  S5      I S h  v•N   [        R                  " U5        g [        XS   SSS9  [        R                  " U5        U R	                  S US   =(       d    US	    35      I S h  v•N   g  N— Nm N	7f)
+Nr  zNo pending channel to skip.rU   r  zSkipped by owner©r_   Únotesu   â­ï¸ Skipped channel: rW   rM   )r   rÿ   r
+  r  rí   rg   r
+  rc   )rõ   rA   Úchs      rC   Ú
+handle_skipÚ&register_commands.<locals>.handle_skip*  sÆ   é € ç
+Š8˜Ÿ™¬8Ó3ØÜ×)Ò)Ó+ˆÞØ—+‘+˜nÓ-×-Ð-ØÜ
+# DÓ
+)ˆÞØ—+‘+Ð;Ó<×<Ð<Ü×(Ò(¨Ô.ØÜ˜4 D¡°(ÐBTÒUÜ×$Ò$ TÔ*Øk‰kÐ4°R¸ ±[×5NÀBÀvÁJÐ4OÐPÓQ×QÑQñ 
+.ñ 
+=ñ
+ 	Rùs7   ‚AC1ÁC+Á+C1Á?C-Â A%C1Ã%C/Ã&C1Ã-C1Ã/C1z	^/status$c           
+   “   óŠ  #   • [         (       a  U R                  [         :w  a  g [        (       a  SOSn[        R                  " 5       nU(       aÓ  [
+        U5        UR
+                  5       nUR                  S5        UR                  5       S   nUR                  S5        UR                  5       S   nUR                  S5        UR                  5       S   nUR                  5         [        R                  " U5        U R                  S U SU S	U S
+U 35      I S h  v•N   g U R                  S
+U S35      I S h  v•N   g  N# N 7f)
+Nu
+   â¸ï¸ PAUSEDu   â–¶ï¸ RUNNINGz8SELECT COUNT(*) FROM t2t_channels WHERE status='pending'r   z;SELECT COUNT(*) FROM t2t_channels WHERE status='processing'z5SELECT COUNT(*) FROM t2t_channels WHERE status='done'u   ðŸ“Š **T2T Status**
+
+State: z
+
+Pending: z | Processing: z	 | Done: z State: u   
+âŒ DB unavailable)r   rÿ   rÔ   r
+  r  rD   r=   r>   rH   r@   r
+  rí   ) rõ   r_   rA   rB   r]   r  r  s           rC   Ú
+handle_statusÚ(register_commands.<locals>.handle_status;  s  é € ç
+Š8˜Ÿ™¬8Ó3Øß$-¢I‘Ð3CˆÜ×)Ò)Ó+ˆÞ
+Ü˜dÔ#Ø—+‘+“-ˆCØK‰KÐRÔSØ—l‘l“n QÑ'ˆGØK‰KÐUÔVØŸ™›¨Ñ*ˆJØK‰KÐOÔPØ—<‘<“> !Ñ$ˆDØI‰IŒKÜ×(Ò(¨Ô.Ø—+‘+ðØ ˜ð "Ø#˜9 O°J°<¸yÈÈðPóQ÷ 
+Qñ 
+Qð
+ —+‘+  ¨ xÐ/CÐDÓE×EÑEñ
+
+Qñ
+ 
+Fùs$   ‚DEÄD?ÄEÄ9EÄ:EÅEz^/findbatchid\s+(tt\d+))rü   Úoutgoingc              “   óø   #   • [         (       a  U R                  [         :w  a  g U R                  R                   S5      R	                  5       n[
+        R
+                  SU 35        [        X5      I S h  v•N   g  N7f)Nr   u     ðŸŽ¯ /findbatchid triggered: )r   rÿ   r	  r
+  rG   rK   rb   r÷   )rõ   rÝ   s     rC   Úhandle_findbatchidÚ-register_commands.<locals>.handle_findbatchidT  sY   é € ç
+Š8˜Ÿ™¬8Ó3ØØ×%Ñ%×+Ñ+¨AÓ.×4Ñ4Ó6ˆ Ü
+‰Ð2°7°)Ð<Ô=Ü% gÓ5×5Ó5ùs   ‚A0A:Á2A8Á3A:z^/stopfindbatch$c              “   óv   #   • [         (       a  U R                  [         :w  a  g [        U 5      I S h  v•N   g  N7fr~   )r   rÿ   rú   r  s    rC   Úhandle_stopfindbatchÚ/register_commands.<locals>.handle_stopfindbatch]  s&   é € ç
+Š8˜Ÿ™¬8Ó3ØÜ$ UÓ+×+Ó+ùs   ‚/9±7²9u     âœ… Owner commands registered)rÂ   rò   r    ró   rK   rb   )r  r  r  r  r$  r'  r+  r.  s           rC   Úregister_commandsr0  í  sq  € Ü
+‡YYŒv× Ò ¨ÀÑEÓFñ
+ ó Gð
+ ô ‡YYŒv× Ò ¨¸tÑDÓEñ0ó Fð0ô ‡YYŒv× Ò Ð)?È$ÑOÓPñTó QðTô  ‡YYŒv× Ò ¨À$ÑGÓHñ,ó Ið,ô, ‡YYŒv× Ò Ð):ÀTÑJÓKñRó LðRô  ‡YYŒv× Ò ¨ÀÑEÓFñFó GðFô0 ‡YYŒv× Ò Ð)CÈdÑSÓTñ6ó Uð6ô ‡YYŒv× Ò Ð)<ÀtÑLÓMñ,ó Nð,ô
+ ‡HHÐ
+.Õ/rE   c              ƒ   ó.  #   • US   nUS   nUS   =(       d    Sn [         R                  U5      I S h  v•N n[        USU5      nUR                  n [	        XXvS[
+        R                  " 5       S 9  [        R                  SU S	U  S
+35         [         R                  [        5      I S h  v•N n	[        R                  SU S35        Sn
+Sn
+SnSn
+SnSnSnSn/ n [         R                  USUSS9  S h  v•N nUS-
+  nUR                  (       d  M!  [        UR                  [         5      (       d  MB  US-
+  n[#        U5      n[%        U5      nUR                  R&                  (       a   UR                  R&                  R(                  OSnU(       a  [+        US-
+  S5      OSn[-        U5      S:  d  MÃ  UR/                  U SU SU SUR                   3 5        Më   GN¨! [          a?  n[        R                  S
+U SU 35        [	        XS
+S[        U5      S S  3S9   S nAgS nAff = f GN! [          a7  n[        R                  S[         SU 35        [	        XS
+SU 3S9   S nAgS nAff = f GN}
+ O/! [          a"  n[        R                  S U 35         S nAOS nAff = f[        R                  S!U S"U S#U S$3 5        U H  n[        R                  S%U 35        M  
+   Un [         R                  USUS&S9  S h  v•N  nU
+S-
+  n
+UR                  (       a‰  [        UR                  [         5      (       aj  U
+S'::  ad  [#        U5      n[%        U5      nU(       a  [+        US-
+  S5      OSn[1        U5      n[        R                  S(UR                   SU SU S)U 35        [3        U5      (       a1  [5        XUR                  5      (       a   US-
+  nMÛ  U
+S-
+  n
+U
+S*:¼  a    O£Mê  UR                  (       d  Mý  [        UR                  [         5      (       d  GM  [1        U5      (       d  U
+S-
+  n
+GM7  [%        U5      [6        :  a  US-
+  nGMR  US-
+  nGMZ  
+ O/! [          a"  n[        R                  S+U 35         S nAOS nAff = f[        R                  S,U
+ S-U
+ S.U S/3 5        [        R                  S0U
+ S1[6        S-   S2U S3U 35        U
+S:X  aO  [        R                  S45        [	        XS5[
+        R                  " 5       UUS6   =(       d    SS7U
+ S8U
+ S9U S:U 3S;9   g<[        R                  S=U
+ S>35        [        R                  S?[         S@35        [9        U	SA5      I S h  v•N  nU(       d!  [        R                  SB5        [	        XS
+SCS9  g[:        R<                  " [>        R@                  " SSD5      5      I S h  v•N    [        R                  SEU S35        SnUS6   =(       d    SnSn[>        RB                  " [D        [F        5      nSn SFn!Sn" [         R                  USUSG9  S h  v•N  n[H        (       a>  [        R                  SH5        [	        XUUSISJ9  [K        5       I S h  v•N    [	        XSSK9  [3        U5      (       d  Me  [5        XUR                  5      (       a  M‚  [#        U5      n[%        U5      nU(       a  [+        US-
+  SL5      OSn[        R                  SMUS-    SN[L         SOU SPU SQ3	5        [:        R<                  " [>        R@                  " [N        [P        5      5      I S h  v•N     UR                  R&                  n#URR                  =(       d    URT                  =(       d    SRn$[W        U	U#U$SFSS9I S h  v•N  n%U%(       aM  US-
+  nUS-
+  nU S-
+  n UR                  n[Y        XUR                  UUS65        [        R                  STU 35        O}[Y        XUR                  UUS
+5        [        R[                  SUU 35        OK! [          a>  n[        R                  SVU SU 35        [Y        XUR                  UUS
+5         S nAOS nAff = fUSD-  S:X  a
+  [	        XUUSW9  U U:¼  a„  [>        R@                  " [\        [^        5      n&US-
+  n[        R                  SXU SYU  SZU&S[ S\3 5        [:        R<                  " U&5      I S h  v•N    Sn [>        RB                  " [D        [F        5      nU[L        :¼  d  GMå  [        R                  S][L         S^35        Sn!SFn"  O
+ U!(       d  Sn"O! [`        Rb                    a,    [        R                  S_U 35        [	        XS
+S`UUSa9  SFU4s $ [          aB  n[        R                  SbU 35        [	        XS
+Sc[        U5      S S  3UUSa9  SFU4s S nA$ S nAff = fUS:”  až  [        R                  Sd[         SPU Se35        [:        R<                  " [>        R@                  " S*Sf5      5      I S h  v•N    [9        U	Sg5      I S h  v•N    [:        R<                  " [>        R@                  " SLSh5      5      I S h  v•N    O’[        R[                  Si5        [:        R<                  " [>        R@                  " SS*5      5      I S h  v•N    [9        U	Sg5      I S h  v•N    [:        R<                  " [>        R@                  " SSL5      5      I S h  v•N    U"(       a=  [	        XS5[
+        R                  " 5       UUSj9  [        R                  SkU SlU Sm35        O([	        XSIUUSn9  [        R                  SoU SpU Sq35        [        R                  SrU SsU St35        SU4$ 7f)uNrU   rM   rX   r   rW   r  )rV   Ú
+channel_titler_   Ú
+started_atu     âœ… Channel resolved: z (ID: Ú)u     âŒ Cannot access channel 'z': r  zAccess error: éÈ   r!  )Fr   u     âŒ Cannot resolve @rä   zBot resolve error: u;     ðŸ“¡ Pre-scanning channel for valid files (from msg_id > z)...Tr[   )Ú reverseÚmin_idÚlimitr   Ú?rŸ   r6   r¡   zMB | msg_id:u     âŒ Raw diagnostic error: u     ðŸ”¬ RAW DIAGNOSTIC: z messages found after msg_id>z
+, of which z are documentsu
+        ðŸ“„ iÐ   r   u
+     ðŸ”Ž MSG#zMB | is_video=rR   u     âŒ Pre-scan error: u     ðŸ” Pre-scan result: z msgs checked | z
+ NEW valid | z
+ already doneu     ðŸ“Š Skip reasons: not_video=z | too_small(<zMB)=z | excluded_keyword=uC     ðŸ“­ No valid movie files found in channel. Skipping /superbatch.r  rZ   zNo valid files. scanned=z
+ skip_vid=z
+ skip_size=z	 skip_kw=)r_   r`   Úlast_forwarded_msg_idÚtotal_files_forwardedr"  )Tr   u     âœ… Pre-scan found z-+ valid files. Proceeding with /superbatch...u     ðŸ“¤ Sending /superbatch to @ú...z
+/superbatchu      âŒ Failed to send /superbatchzsuperbatch send failedr   u4     ðŸ“¡ Forwarding files from channel (from msg_id > F)r6  r7  u/     â¸ï¸ Paused mid-channel. Saving progress...r]   )r:  r;  r_   )r_   r   u     ðŸ“ [run:Ú/z] rá   z MB)r   râ   u     âœ… Sent: u     âŒ Failed: u
+     âŒ Error: )r:  r;  u     ðŸ”„ Batch #z  done (z files). Cooling z.0fzs...u
+     ðŸ›‘ Hit z-file limit for this run.u'     âŒ Channel is private/inaccessible: zChannel private/inaccessible)r_   r"  r:  r;  u     âŒ Channel iteration error: zIteration error: u     ðŸ“¤ Sending /superdone to @z files forwarded)...rT   z
+/superdonerS   uS     âš ï¸ 0 files forwarded â€” SKIPPING /superdone (no need to trigger empty batch))r_   r`   r:  r;  u     ðŸŽ‰ Channel 'z' FULLY DONE! z total files forwarded.)r_   r:  r;  u     â¸ï¸ Channel 'z' paused at z files. Will resume next cycle.u     ðŸ“Š This run: z files | Lifetime: z files)2rÂ   rï   Ú getattrrU   rc   r   ra   rK   rb   rI   rL   Ústrrð   Ú
+iter_messagesr…   r†   r
+   r¢   r£   r‡   rˆ   r¤   Úlenrj   r”   r«   rw   r¥   rÎ   rµ   r¶   r±   r²   rÆ   Ú	BATCH_MINÚ	BATCH_MAXrÔ   rÜ   ÚMAX_FILES_PER_CHANNELr³   r´   rœ   r   rÒ   ru   rÇ   ÚBATCH_PAUSE_MINÚBATCH_PAUSE_MAXr   ÚChannelPrivateError)'rA   Úchannel_datarf   rM   rX   rÈ   rW   Ú
+resolved_idrO   rê   Ú
+scan_countÚ
+msg_scannedÚalready_forwarded_countÚskip_not_videoÚskip_too_smallÚ
+skip_excludedÚ
+raw_msg_countÚ
+raw_doc_countÚsample_filesr   r§   r¨   r’   r©   ÚsfÚeffective_min_idÚis_vidÚsbÚ
+run_forwardedÚtotal_forwardedÚ
+batch_countÚ
+batch_sizeÚfiles_in_batchÚ	hit_limitÚchannel_exhaustedr‘   rª   ré   Ú
+pause_times'                                          rC   Út2t_forward_channel_filesr_  f  sþ
+  é € Ø˜Ñ€EØ
+˜Ñ
+€DØ˜}Ñ-×2°€Kð
+Ü×(Ñ(¨Ó.×.ˆÜ˜  ¨Ó.ˆØ—i‘iˆ
+Ü˜4°;Ø".¼8¿?º?Ó;Lò	Nä
+‰Ð+¨E¨7°&¸¸
+ÀQÐGÔHðÜ!×,Ñ,¬]Ó;×;ˆ
+ô ‡HHÐJÈ;È-ÐW[Ð
+\Ô]à€JØ€KØÐØ€NØ€NØ€Mð €MØ€MØ€Lð6Ü#×1Ñ1°&À$È{ÐbdÐ1Ñe÷ 		a'Ø˜QÑˆMØ}}‰}¤¨G¯M©MÔ;O×!PÓ!PØ Ñ"
+Ü$ WÓ-Ü% gÓ.Ø;B¿=¹=×;Q×;Qw—}‘}×-Ñ-×7Ò7ÐWZÞ;@œ% ¨Ñ 3°QÔ7Àa Ü|Ó$ qÕ(Ø ×'Ñ'¨5¨'°°T°F¸#¸g¸YÀlÐSZ×S]ÑS]ÐR^Ð(_Ö`òW /øô ó Ü
+	‰	Ð1°$°°s¸1¸#Ð>Ô?Ü˜4¨xÀÔPSÐTUÓPVÐW[ÐX[ÐP\È~Ð?^Ò_Üûð úò <øÜ
+ó Ü
+	‰	Ð*¬=¨/¸¸A¸3Ð?Ô@Ü˜4¨xÐATÐUVÐTWÐ?XÒYÜûð úò(		aÑeøô ó 6Ü
+	‰	Ð0°°Ð4×5Ñ5ûð6úô ‡HHÐ& } oÐ5RÐS^ÐR_Ð_jÐkxÐjyð  zHð  Iô  JÛˆÜ
+‰:˜b˜TÐ"Ö#ñ ð #Ðð0Ü#×1Ñ1°&À$ÐO_ÐgkÐ1Ñl÷ 	+ð 	+'Ø˜1ÑˆKð }}¤¨G¯M©MÔ;O×!PÑ!PÐU`ÐdfÓUfÜ$ WÓ-Ü% gÓ.Þ;@œ% ¨Ñ 3°QÔ7Àa Ü& wÓ/Ü—‘˜; w§z¡z l°"°U°G¸3¸w¸iÀ~ÐV\ÐU]Ð^Ô_ä˜W×%Ñ%Ü+¨D¸¿¹×DÑDØ+¨qÑ0Ò+à !‘OJØ! Q“Ùñ 'ð —=—=‘=¤Z° ·
+±
+Ô?S×%TÔ%TÜ(¨×1Ñ1Ø&¨!Ñ+›Ü& wÓ/´-Ó?Ø&¨!Ñ+›à%¨Ñ*›
+ñ5 møô6 ó 0Ü
+	‰	Ð*¨1¨#Ð.×/Ñ/ûð0úô ‡HHÐ'¨
+ }Ð4DÀZÀLÐP]Ð^uÐ]vð  wDð  Eô  FÜ ‡HHÐ.¨~Ð.>¸nÌ]Ð]fÑMgÐLhÐhlÐm{Ðl|ð  }Qð  R_ð  Q`ð  aô  bà QƒÜ
+‰ÐVÔXÜ˜4¨vÄHÇOÂOÓDUØ1<Ø2>¸{Ñ2K×2PÈqØ#;¸K¸=È
+ÐSaÐRbÐbmÐn|Ðm}ð  ~Gð  HUð  GVð  "Wò 	Xð ä ‡HHÐ$ Z LÐ0]Ð
+^Ô_ô ‡HHÐ.¬}¨o¸SÐ
+AÔBÜ  ¨]Ó;×	;Ð	;€BÞ
+
+Ü
+	‰	Ð4Ô5Ü˜4¨xÐ?WÒXØÜ
+-Š-œŸš q¨"Ó-Ó
+.×.Ñ.ô ‡HHÐCÐDTÐCUÐUYÐ
+ZÔ[Ø€MØ" ;Ñ/×4°1€OØ€KÜ—’¤	¬9Ó5€JØ€NØ€IØÐðM$Ü#×1Ñ1°&À$ÐO_Ð1Ñ`÷ =	ð =	'çŠyÜ—‘ÐJÔKÜ" 4ÀkØ9HÐQZò\ä%Ó'×'Ñ'Ü" 4°|ÒDä  ×)Ñ)Ùô (¨°W·Z±Z×@Ñ@Ùä  Ó)ˆEÜ! 'Ó*ˆEÞ7<”e˜E YÑ/°Ô3À!ˆGô 
+H‰H| M°!¡OÐ#4°AÔ6KÐ5LÈBÈuÈgÐUWÐX_ÐW`Ð`dÐeÔfÜ—-’-¤§¢¬~¼~Ó NÓO×OÑOð
+QØ—m‘m×,Ñ,Ø!Ÿ,™,×?¨'¯/©/×?¸R Ü+¨J¸SÈ'ÐbgÑh×hÐhÞØ! QÑ&MØ# qÑ(OØ" aÑ'NØ")§*¡*KÜ# D°·±¸UÀEÈ;ÔWÜ—H‘H˜|¨E¨7Ð3Õ4ä# D°·±¸UÀEÈ8ÔTÜ—K‘K .°° Ð 8Õ9øÜó 
+QÜ—	‘	˜M¨%¨°°1°#Ð6Ô7Ü ¨W¯Z©Z¸ÀÀx×PÑPûð
+Qúð
+ ˜rÑ! QÓ&Ü" 4ÀkØ9HòJð  Ó+Ü#Ÿ^š^¬O¼_ÓM
+Ø˜qÑ 
+Ü—‘˜>¨+¨°g¸nÐ=MÐM^Ð_iÐjmÐ^nÐnrÐsÔtÜ—m’m JÓ/×/Ñ/Ø!"Ü#Ÿ^š^¬I´yÓA
+ð Ô 5Ö5Ü—‘˜;Ô'<Ð&=Ð=VÐWÔXØ 	Ø$)Ð!Ùð{ aö@ Ø $Ðùä
+×
+%Ñ
+%ó $Ü
+	‰	Ð;¸D¸6ÐBÔCÜ˜4¨xÐ?]Ø1<ÐTcò	eàmÐ#Ò#Ü
+ó $Ü
+	‰	Ð3°A°3Ð7Ô8Ü˜4¨xÐARÔSVÐWXÓSYÐZ^Ð[^ÐS_ÐR`Ð?aØ1<ÐTcò	eàmÐ#Õ#ûð	$úð qÓ Ü
+‰Ð1´-°ÀÀ=À/ÐQeÐfÔgÜmŠmœFŸNšN¨1¨aÓ0Ó1×1Ñ1Ü 
+¨LÓ9×9Ñ9ÜmŠmœFŸNšN¨1¨aÓ0Ó1×1Ò1ä
+
+‰
+ÐiÔkämŠmœFŸNšN¨1¨aÓ0Ó1×1Ñ1Ü 
+¨LÓ9×9Ñ9ÜmŠmœFŸNšN¨1¨aÓ0Ó1×1Ñ1ö ä˜4¨vÄHÇOÂOÓDUØ1<ÐTcò	eä
+‰Ð# E 7¨.¸Ð8IÐI`ÐaÕbô 	˜4¨yØ1<ÐTcò	eä
+‰Ð% e W¨L¸Ð8IÐIhÐiÔjä ‡HHÐ   Ð/BÀ?ÐBSÐSYÐ
+ZÔ[Ø
+Ð
+Ðùs\  ‚nœG ´GµAG ÂH. Â*H+Â+H. Â/+nÃI7 Ã1I5Ã5I2Ã6I5Ã9I7 ÄI7 Ä3A=I7 Æ4(I7 ÇG Ç
+H(Ç)5H#ÈnÈ#H(È(nÈ+H. È.
+I/È8-I*É%nÉ*I/É/nÉ2I5É5I7 É6nÉ7
+J#ÊJÊnÊJ#Ê#AnË)Q Ë?QÌLÌQÌCQ Ï&nÏ'Q Ï<Q Ð<Q ÑnÑ
+R Ñ%RÑ=nÒR Ò C$nÕ+U.Õ,An× W
+×AnØe Ø3d;Ø7X:Ø8d;Ø<:e Ù6Y9Ù7C
+e Ý]Ýe Ý	A
+`"Þ^ÞA`"ß/e ß01`"à!e à"
+a*à,4a%á e á%a*á*A:e ã$c'ã%.e ä-e ånå=gænæ	gæ7g
+çgçnç
+gçAnè'h*è(nè<h?è=3né0i3é1A	nê:j=ê;nëkë3nìlìBnc                  ó‚   • [         R                  " 5       n U R                  S-  U R                  -   nSU-
+  nUS::  a  SnU$ )z=Calculate seconds remaining until the start of the next hour.é<   r   r   )r   rÉ   ÚminuteÚsecond)rÉ   Úseconds_pastÚ	remainings      rC   Ú_seconds_until_next_hourrf  N  s?   € ä
+,Š,‹.€CØ—:‘: ‘? S§Z¡ZÑ/€LØ|Ñ#€IØ Aƒ~Øˆ	Ø
+ÐrE   c            
+   ƒ   óF
+  #   • [         R                  SS 35        [         R                  S5        [         R                  S5        [         R                  S[         S35        [         R                  S [         S[         S	[
+         S[         S
+3	5        [         R                  S
+[        S-   S
+35        [         R                  S 5        [        R                  " 5       n U R                  S:w  a_  [        5       nU [        US9-   R                  S5      n[         R                  SU SU S35        [        R                  " U5      I S h  v•N   Sn US-
+  n[         (       a  [#        5       I S h  v•N   [$        R'                  5       (       dF  [         R)                  S5        [$        R+                  5       I S h  v•N   [         R                  S5        [        R                  " 5       n [         R                  SU SU R                  S5       S35        [,        R.                  " 5       nU(       d>  [         R1                  S5        [        R                  " [        5       5      I S h  v•N   GM  [3        U5         [5        U5      nU(       d  [         R                  S5        GOY[         R                  SS 35        [         R                  SUS   =(       d    US    35        [         R                  S US!    S"US#    35        [         R                  S 5         [7        XE5      I S h  v•N u  pgU(       a  [         R                  S&5        O[         R                  S'5        U S:”  aY  [         R                  S(U  S)35        [?        XES*   S+[        R@                  " 5       S,9  [        R                  " S-5      I S h  v•N   O9[         R                  S.5        [?        XES*   S+[        R@                  " 5       S,9  GM€  GM‚  [,        RB                  " U5        [        5       n[        R                  " 5       [        US9-   R                  S5      n[         R                  S/U S0U S135        Sn
+X¡:  aU  [         (       a  [#        5       I S h  v•N   O7[E        S2X-
+  5      n
+[        R                  " U
+5      I S h  v•N   X«-
+  n
+X¡:  a  MU  GMr   GNz GNX GN GNh GN©! [8          a;  n[         R1                  S$U 35        SS Kn	U	R=                  5         S%nSn  S nAGNåS nAff = f GNb N™ Nn7f)3Nr  u®   â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•u.     ðŸ¤– T2T PIPELINE â€” STRICT Clock Sync Modeu+     â° Runs at the top of EVERY hour (XX:00)u
+     ðŸ“¦ Max z files per channel per runu     ðŸ“¦ Batch: Ú-z
+ files, then z s pauseu     ðŸ“¦ Min file size: rŸ   r    r   )rÅ   z%H:00:00u#     â° Initial Clock Sync: Sleeping zs until r<  r   u0     ðŸ”Œ Telethon disconnected â€” reconnecting...u     âœ… Telethon reconnected.u%   
+  ðŸš€ [CLOCK-WISE] Hourly T2T run #z
+ starting at r   u     âŒ DB connection failed!u8     ðŸ“­ All channels processed. No more pending channels.u¥   â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”u     ðŸŽ¯ Target: rW   rM   u     ðŸ“Š Previously forwarded: rZ   z | Resume from msg: rX   u     ðŸ’¥ Pipeline error: Fu+     âœ… Channel batch completed successfully.u     â© Channel failed/skipped.z  Forwarded zF files. Status marked 'done'. Resting for 1 hour to prevent FloodWait.rU   r  r^   r   zJ  No new files found. Status marked 'done'. Fast skipping to next channel.u     â° Clock Sync: Next run in z s (at ~z). Sleeping...r    )#rK   rb   rD  rB  rC  rE  rF  r¥   r   rÉ   rb  rf  r   Ústrftimerµ   r¶   rÔ   rÜ   rÂ   Úis_connectedrÇ   Ú connectr
+  r  rL   rD   rg   r_  rI   Ú	tracebackÚ	print_excrc   ra   r
+  Úmin)rÉ   Ú	wait_secsÚ	next_hourÚrunrA   Ú channelÚ successrW  rO   rl  ÚsleptÚchunks               rC   Út2t_run_pipelinerv  W  s&  é € ä ‡HHˆr(ˆ_ÔÜ ‡HHÐ=Ô?Ü ‡HHÐ:Ô<Ü ‡HHˆ{Ô0Ð1Ð1KÐ
+LÔMÜ ‡HHˆ~œi˜[¨¬)¨°MÄ/ÐARÐRSÔTcÐSdÐdkÐ
+lÔmÜ ‡HHÐ%¤m°iÑ&@Ð%AÀÐ
+DÔEÜ ‡HHˆzÔô 
+,Š,‹.€CØ 
+‡zzQƒÜ,Ó.ˆ	Øœ9¨YÑ7Ñ7×AÑAÀ*ÓMˆ	Ü
+‰Ð6°y°kÀÈ)ÈÐTWÐXÔYÜmŠm˜IÓ&×&Ð&à
+
+€CØ
+Ø
+ˆq‰ˆß
+Š9Ü!Ó#×#Ð#ô ×"Ñ"×$Ñ$ÜK‰KÐJÔKÜ—.‘.Ó"×"Ð"ÜH‰HÐ2Ô3älŠl‹nˆÜ
+‰Ð9¸#¸¸mÈCÏLÉLÐYcÓLdÐKeÐehÐiÔjä×)Ò)Ó+ˆÞÜI‰IÐ3Ô4Ü—-’-Ô 8Ó :Ó;×;Ð;Úä˜$Ôð Ü,¨TÓ2ˆGÞÜ—‘ÐSÔUÙäH‰Hr˜(˜_Ô%ÜH‰H w¨wÑ'7×'J¸7À6¹?Ð&KÐLÔMÜH‰HÐ4°W¸[Ñ5IÐ4JÐJ^Ð_fÐgtÑ_uÐ^vÐwÔxÜH‰H˜zÔ#ð 
+"Ü/HÈÓ/W×)WÑ& ö Ü—‘ÐFÕHä—‘Ð8Ô:à˜qÓ Ü—‘˜<¨
+ Ð6|Ð}Ô~Ü" 4°©¸vÔT\×TcÒTcÓTeÒfÜ—m’m DÓ)×)Ñ)ä—‘ÐeÔfÜ" 4°©¸vÔT\×TcÒTcÓTeÒfÚòA ôD 	×$Ò$ TÔ*ô -Ó.ˆ	Ü—\’\“^¤i¸	Ñ&BÑB×LÑLÈZÓXˆ	Ü
+‰Ð1°)°¸GÀIÀ;ÈnÐ]Ô^ð ˆØÓßŠyÜ%Ó'×'Ð'ØÜ˜˜IÑ-Ó.ˆEÜ—-’- Ó&×&Ð&Ø‰NˆEð
+ ÕòK 
+ò  	'ò 
+$ò
+ 
+#ò 
+<ò$ *XøÜó 
+"Ü—	‘	Ð3°A°3Ð7Ô8Û Ø×#Ñ#Ô%Ø Ø !–
+ûð
+
+"úò *ñ( (ñ 
+'ùs¿   ‚E T!Å	SÅ
+$T!Å.SÅ/A	T!Æ8S	Æ9B+T!É$SÉ%B2T!ÌS Ì&SÌ'S Ì-B
+T!Î8TÎ9C
+T!ÒTÒ,T!Ò0TÒ1
+T!Ó T!ÓT!Ó	T!ÓT!ÓS Ó
+TÓ0TÔT!ÔTÔT!ÔT!ÔT!c                ƒ   ó˜  #   • [         R                  5       I S h  v•N n [        R                   SU R                   SU R
+                  =(       d    S S35        [        R                   SU R                   35        [        U S5      (       a'  U R                  (       a  [        R                  S 5        g[        R                   S	5        g
+ N­7f)
+Nu     ðŸ“± Account: z (@zN/Ar4  u
+     ðŸ†” ID: Ú
+restrictedu     ðŸš« ACCOUNT RESTRICTED!Fu     âœ… Account healthyT)
+rÂ   Úget_merK   rb   Ú
+first_nameÚusernamerU   Ú hasattrrx  rL   )Úmes    rC   Úsafety_checkr~  ¸  sŒ   é € Ü}‰}‹×	€BÜ ‡HHÐ §
+¡
+˜¨c°"·+±+×2FÀÐ1GÀqÐ
+IÔJÜ ‡HHˆ{˜2Ÿ5™5˜'Ð
+"Ô#Ü ˆr<×  Ñ   R§]§]Ü
+	‰	Ð.Ô/ØÜ ‡HHÐ
+$Ô%Ø
+ñ 
+ùs   ‚C
+šC›B.C
+c                  óJ  • [         R                   " [         R                  [         R                  5      q [        R	                  S5        [
+        R
+                  S5        g ! [         R                    a.    [
+        R                  S5        [        R                  " S5         g f = f)N)z	127.0.0.1in²  u0   âœ… Single instance lock acquired on port 45678.uC   ðŸ›‘ Another instance of T2T Userbot is already running. Exiting...r   )
+ÚsocketÚ AF_INETÚ
+SOCK_STREAMÚ_lock_socketÚbindrK   rb   rL   ÚsysÚexitr—   rE   rC   Úenforce_single_instancer‡  Ê  sh   € ä—=’=¤§¡´×1CÑ1CÓD€LðÜ×ÑÐ.Ô/Ü
+‰ÐCÕDøÜ
+<‰<ó Ü
+	‰	ÐWÔXÜ
+ŠŽ
+ðús   µ*A  Á ?B"Â!B"c               ƒ   ó  #   • [        5         [        R                  S5        [        R	                  5       I S h  v•N   [        R
+                  5       I S h  v•N (       d2  [        R
+                  S5        [        R                  5       I S h  v•N   g [        5       I S h  v•N n U (       d  [        R                  5       I S h  v•N   g [        R                  " S5      I S h  v•N   [        5         [        R                  " 5       nU(       a!  [        U5        [        R                  " U5        [        R                  S5        [!        5       I S h  v•N   [        R                  5       I S h  v•N   g  GN7 GN Nê NÙ N¸ N› N/ N7f)Nu#   ðŸ¤– Starting T2T Userbot Worker...u7   âŒ Session expired ya invalid! Run: python qr_login.pyr   u7     â›” Promo system is DISABLED. Only scraping will run.)r‡  rK   rb   rÂ   rk  Úis_user_authorizedrL   Ú
+disconnectr~  rµ   r¶   r0  r
+  r  rD   r
+  rv  )Ú healthyrA   s     rC   Ústart_t2t_workerrŒ  Õ  s
+  é € ÜÔÜ ‡HHÐ
+2Ô3Ü
+.‰.Ó
+×Ðä×*Ñ*Ó,×
+,Õ
+,Ü
+	‰	ÐKÔLÜ×ÑÓ!×!Ð!Øä “N×"€GÞ
+Ü×ÑÓ!×!Ð!Øä
+-Š-˜Ó
+×ÐÜÔô ×
+%Ò
+%Ó
+'€DÞ 
+Ü˜$ÔÜ×$Ò$ TÔ*ä ‡HHÐ
+FÔGä
+Ó
+×ÐÜ
+×
+Ñ
+Ó
+×Ñò1 â
+,á!ñ #á!ñ ñ ÙùsŽ   ‚7F¹E0ºFÁE3Á5FÂ
+E6ÂFÂE8Â"FÃE:ÃFÃ E<Ã!A-FÅE>ÅFÅ*F Å+FÅ3FÅ6FÅ8FÅ:FÅ<FÅ>FÆ FÚ__main__u   
+ðŸ‘‹ T2T Userbot stopped.)rZ   )r   )_Ú __doc__ÚosÚrer…  r±   rµ   Ú loggingÚjsonr€  r   r   Údotenvr   Ú
+ImportErrorÚtelethonr   r    r   Útelethon.tl.typesr	   r
+   r
+   Útelethon.sessionsr   Útelethon.errorsr
+   Úprintr†  r
+  Ú
+basicConfigÚINFOÚ	getLoggerrK   ÚintÚ environr  r   r   r   ÚSESSION_STRINGrð   ÚCHANNEL_COOLDOWNr³   r´   rB  rC  rE  rF  rD  r¥   r›   rŠ   r   rÀ   r¿   rÔ   rØ   rñ   rî   rå   rô   ræ   Úsession_storagerÂ   rD   rP   rg   rc   ru   rw   r{   r”   r   r«   r¢   r£   r¹   rÎ   rÒ   rÖ   rÜ   r?  r÷   rú   r0  r_  rf  rv  r~  rƒ  r‡  rŒ  Ú__name__rq  ÚKeyboardInterruptr—   rE   rC   Ú<module>r¤     s¥  ðñ÷ 3× 2× 2Ó 2Û 
+ß (ð	Ý"Ù„Mð ß7Ñ7ßiÑiÝ/Ý7ó à  × Ò ˜'Ÿ,™,Ð/XÐblÒ mØ
+×Ò˜Ó€ñ 
+
+ˆRZ‰Z^‰^˜H dÓ
++Ó	,€Ø
+
+:‰:>‰>˜*Ð&HÓ
+I€Ù
+ˆrz‰z~‰~˜j¨!Ó,Ó
+-€Ø—‘—‘Ð 1°2Ó6€Ø€
+ØÐ Ø!%Ñ €ØÑ €	ˆ9Ø#)Ñ  €ØÐ Ø €
+ÚFÐ òBÐ ò OÐ Ø€
+Ø€Ø€	Ø€
+ð !€
+ØÐ Ø€ØÐ ØÐ æ Ù	Ð
+4Ô5Ù	Ð
+8Ô9Ø ‡H‚HˆQ„Ká Ó/€á	˜¨°Ø¨<ÀXñ
+O€ò òDò&IòP
+ô
+òòòò>=ò0òd ò
+ôòò0ò&ò	"ð RJ¨3ô RJòjOòBv0òreòP  ò^òBð  €òòð: ˆzÓð-Ø
+Š
+Ñ$Ó&Õ'ð øðO ó 	Úð	ûð ó Ù	Ð
+ Ô!Ø ‡H‚HˆQ‡KðûðD ó -Ù
+Ð+Ö,ð-ús4   ¬
+G1 º G> ÇH% Ç1G;Ç:G;Ç> H"È!H"È%H6È5H6
