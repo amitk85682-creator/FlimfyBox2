@@ -3,7 +3,7 @@ T2T Userbot — Telegram-to-Telegram Channel Forwarder
 Forwards MKV/MP4 files from target channels to @FlimfyBoxBot PM.
 """
 import os, re, sys, random, asyncio, logging, json
-import socket
+import socket, signal, traceback
 from datetime import datetime, timedelta
 try:
     from dotenv import load_dotenv
@@ -16,6 +16,7 @@ try:
     from telethon.tl.types import DocumentAttributeFilename, DocumentAttributeVideo, MessageMediaDocument
     from telethon.sessions import StringSession
     from telethon.errors import MessageNotModifiedError
+    from telethon.errors.rpcerrorlist import AuthKeyDuplicatedError
 except ImportError:
     print("pip install telethon")
     sys.exit(1)
@@ -47,6 +48,7 @@ MIN_MSG_GAP = 5                              # Min gap for text commands only
 _last_msg_time = 0.0
 is_paused = False
 _resume_event = None
+_shutdown_requested = False  # Graceful shutdown flag for SIGTERM
 
 # ── FindBatchID Config (Monitor Mode) ──
 TARGET_BOT = "Searchmovie4u_bot"
@@ -876,11 +878,25 @@ async def t2t_run_pipeline():
         if is_paused:
             await wait_for_resume()
 
+        # Check if shutdown was requested (SIGTERM from Render redeploy)
+        if _shutdown_requested:
+            log.info("  🛑 Shutdown requested. Exiting pipeline gracefully...")
+            return
+
         # Re-establish MTProto connection if it dropped during sleep
         if not client.is_connected():
             log.warning("  🔌 Telethon disconnected — reconnecting...")
-            await client.connect()
-            log.info("  ✅ Telethon reconnected.")
+            try:
+                await client.connect()
+                log.info("  ✅ Telethon reconnected.")
+            except AuthKeyDuplicatedError:
+                log.critical("  🔑 Session DEAD during pipeline! AuthKeyDuplicatedError.")
+                log.critical("  💀 Cannot continue. Run: python qr_login.py to create new session.")
+                return
+            except Exception as e:
+                log.error(f"  ❌ Reconnect failed: {e}")
+                await asyncio.sleep(30)
+                continue
 
         now = datetime.now()
         log.info(f"\n  🚀 [CLOCK-WISE] Hourly T2T run #{run} starting at {now.strftime('%H:%M:%S')}...")
@@ -938,9 +954,12 @@ async def t2t_run_pipeline():
         next_hour = (datetime.now() + timedelta(seconds=wait_secs)).strftime("%H:%M:%S")
         log.info(f"  ⏰ Clock Sync: Next run in {wait_secs}s (at ~{next_hour}). Sleeping...")
 
-        # Sleep in chunks for pause responsiveness
+        # Sleep in chunks for pause/shutdown responsiveness
         slept = 0
         while slept < wait_secs:
+            if _shutdown_requested:
+                log.info("  🛑 Shutdown during sleep. Exiting pipeline...")
+                return
             if is_paused:
                 await wait_for_resume()
                 break
@@ -977,38 +996,125 @@ def enforce_single_instance():
         log.error("🛑 Another instance of T2T Userbot is already running. Exiting...")
         sys.exit(0)
 
+# ── Graceful Shutdown Handler (SIGTERM from Render redeploy) ──
+def _setup_signal_handlers():
+    """Register SIGTERM/SIGINT handlers for graceful shutdown on Render."""
+    global _shutdown_requested
+    def _handle_signal(signum, frame):
+        global _shutdown_requested
+        sig_name = signal.Signals(signum).name if hasattr(signal, 'Signals') else str(signum)
+        log.info(f"🛑 Received {sig_name}. Requesting graceful shutdown...")
+        _shutdown_requested = True
+    
+    signal.signal(signal.SIGTERM, _handle_signal)
+    signal.signal(signal.SIGINT, _handle_signal)
+    log.info("✅ Signal handlers registered (SIGTERM/SIGINT → graceful shutdown)")
+
 # ── Entry Point ──
 async def start_t2t_worker():
+    global client, _shutdown_requested
     enforce_single_instance()
+    _setup_signal_handlers()
     log.info("🤖 Starting T2T Userbot Worker...")
-    await client.connect()
 
-    if not await client.is_user_authorized():
-        log.error("❌ Session expired ya invalid! Run: python qr_login.py")
-        await client.disconnect()
-        return
+    # ── Startup Delay: give old instance time to shut down (Render redeploy) ──
+    log.info("⏳ Waiting 15s for old instance to shut down (Render redeploy safety)...")
+    await asyncio.sleep(15)
 
-    healthy = await safety_check()
-    if not healthy:
-        await client.disconnect()
-        return
+    MAX_RETRIES = 5
+    for attempt in range(1, MAX_RETRIES + 1):
+        if _shutdown_requested:
+            log.info("🛑 Shutdown requested before connect. Exiting...")
+            return
 
-    await asyncio.sleep(10)
-    register_commands()
+        try:
+            log.info(f"🔌 Connecting to Telegram... (Attempt {attempt}/{MAX_RETRIES})")
+            await client.connect()
 
-    # Ensure tables exist on startup
-    conn = db_utils.get_db_connection()
-    if conn:
-        t2t_ensure_tables(conn)
-        db_utils.close_db_connection(conn)
+            if not await client.is_user_authorized():
+                log.error("❌ Session expired ya invalid! Run: python qr_login.py")
+                await client.disconnect()
+                return
 
-    log.info("  ⛔ Promo system is DISABLED. Only scraping will run.")
+            healthy = await safety_check()
+            if not healthy:
+                await client.disconnect()
+                return
 
-    await t2t_run_pipeline()
-    await client.disconnect()
+            log.info("✅ Connected & authorized! Waiting 10s before starting pipeline...")
+            await asyncio.sleep(10)
+            register_commands()
+
+            # Ensure tables exist on startup
+            conn = db_utils.get_db_connection()
+            if conn:
+                t2t_ensure_tables(conn)
+                db_utils.close_db_connection(conn)
+
+            log.info("  ⛔ Promo system is DISABLED. Only scraping will run.")
+
+            await t2t_run_pipeline()
+            await client.disconnect()
+            return  # Clean exit
+
+        except AuthKeyDuplicatedError:
+            log.error(f"🔑 AuthKeyDuplicatedError! Session used from 2 different IPs. (Attempt {attempt}/{MAX_RETRIES})")
+            log.error("   This happens when old & new Render instances overlap.")
+            try:
+                await client.disconnect()
+            except Exception:
+                pass
+
+            if attempt < MAX_RETRIES:
+                wait_time = min(30 * (2 ** (attempt - 1)), 300)  # 30s, 60s, 120s, 240s, max 300s
+                log.info(f"⏳ Waiting {wait_time}s before retry (old instance should be dead by then)...")
+                await asyncio.sleep(wait_time)
+
+                # Recreate client with fresh StringSession from same session string
+                log.info("🔄 Recreating Telethon client with fresh session...")
+                fresh_session = StringSession(SESSION_STRING)
+                client = TelegramClient(fresh_session, API_ID, API_HASH,
+                    device_model="Desktop", system_version="Windows 11", app_version="4.14.9")
+            else:
+                log.critical("💀 All retries exhausted! Session is permanently DEAD.")
+                log.critical("💀 You MUST create a new session: python qr_login.py")
+                log.critical("💀 Then update USERBOT_SESSION in Render environment variables.")
+                return
+
+        except ConnectionError as e:
+            log.error(f"🔌 Connection error: {e} (Attempt {attempt}/{MAX_RETRIES})")
+            try:
+                await client.disconnect()
+            except Exception:
+                pass
+            if attempt < MAX_RETRIES:
+                wait_time = 30 * attempt
+                log.info(f"⏳ Retrying in {wait_time}s...")
+                await asyncio.sleep(wait_time)
+            else:
+                log.critical("💀 All connection retries exhausted!")
+                return
+
+        except Exception as e:
+            log.error(f"💥 Unexpected error during startup: {e}")
+            traceback.print_exc()
+            try:
+                await client.disconnect()
+            except Exception:
+                pass
+            if attempt < MAX_RETRIES:
+                wait_time = 30 * attempt
+                log.info(f"⏳ Retrying in {wait_time}s...")
+                await asyncio.sleep(wait_time)
+            else:
+                log.critical("💀 All retries exhausted due to unexpected errors!")
+                return
 
 if __name__ == "__main__":
     try:
         asyncio.run(start_t2t_worker())
     except KeyboardInterrupt:
         print("\n👋 T2T Userbot stopped.")
+    except Exception as e:
+        print(f"\n💀 T2T Userbot FATAL: {e}")
+        traceback.print_exc()
