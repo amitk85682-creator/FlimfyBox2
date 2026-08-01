@@ -6098,7 +6098,7 @@ async def pm_file_listener(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if BATCH_18_SESSION.get('active') or SUPER_BATCH_SESSION.get('active'):
         return
     # 👇 NAYA CODE: VIP Payment Screenshot Check 👇
-    if context.user_data.get('payment_step') == 'screenshot' and update.message.photo:
+    if context.user_data and context.user_data.get('payment_step') == 'screenshot' and update.message and update.message.photo:
         await payment_photo_handler(update, context)
         return
 
