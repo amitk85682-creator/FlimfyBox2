@@ -613,22 +613,63 @@ def register_commands():
     log.info("  ✅ Owner commands registered")
 
 # ── Core T2T Logic ──
+async def resolve_t2t_channel(channel_data):
+    """Resolve channel entity using stored ID first, fallback to invite link."""
+    stored_id = channel_data.get("channel_id")
+    link = channel_data.get("link")
+    
+    entity = None
+    
+    # 1. Try resolving using stored channel_id from joined dialogs
+    if stored_id:
+        try:
+            async for dialog in client.iter_dialogs():
+                if getattr(dialog.entity, "id", None) == stored_id:
+                    entity = dialog.entity
+                    log.info(f"  ✅ Channel resolved from joined dialogs using stored Telegram ID")
+                    break
+        except Exception as e:
+            log.warning(f"  ⚠️ Dialog search error for ID {stored_id}: {e}")
+            
+    if entity is None and stored_id:
+        log.warning(f"  ⚠️ Stored channel ID not found in current joined dialogs")
+
+    # 2. Fallback to invite link if entity is still None
+    if entity is None and link:
+        try:
+            entity = await client.get_entity(link)
+            log.info(f"  ✅ Channel resolved using channel link")
+        except Exception as e:
+            log.error(f"  ❌ Unable to access channel using original link '{link}': {e}")
+            return None
+            
+    return entity
+
 async def t2t_forward_channel_files(conn, channel_data, remaining_limit):
     ch_id = channel_data["id"]
     link = channel_data["link"]
     last_msg_id = channel_data["last_msg_id"] or 0
 
+    log.info(f"  🔎 Resolving channel: {channel_data.get('title') or link}")
+    if channel_data.get("channel_id"):
+        log.info(f"  🆔 Stored Telegram channel ID: {channel_data['channel_id']}")
+
     # Resolve channel
+    entity = await resolve_t2t_channel(channel_data)
+    
+    if not entity:
+        log.error(f"  ❌ Unable to access channel using stored ID or original link")
+        t2t_update_channel(conn, ch_id, status="failed", notes="Channel inaccessible (both ID and link failed)")
+        return False, 0
+        
     try:
-        entity = await client.get_entity(link)
         title = getattr(entity, 'title', link)
         resolved_id = entity.id
         t2t_update_channel(conn, ch_id, channel_id=resolved_id, channel_title=title,
                            status="processing", started_at=datetime.utcnow())
-        log.info(f"  ✅ Channel resolved: {title} (ID: {resolved_id})")
     except Exception as e:
-        log.error(f"  ❌ Cannot access channel '{link}': {e}")
-        t2t_update_channel(conn, ch_id, status="failed", notes=f"Access error: {str(e)[:200]}")
+        log.error(f"  ❌ Error updating channel state: {e}")
+        t2t_update_channel(conn, ch_id, status="failed", notes=f"State update error: {str(e)[:200]}")
         return False, 0
 
     # Get FlimfyBoxBot entity
