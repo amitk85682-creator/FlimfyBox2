@@ -37,7 +37,7 @@ CHANNEL_COOLDOWN = 3600
 FILE_DELAY_MIN, FILE_DELAY_MAX = 1, 2       # Fast burst: tiny gap between files in a batch
 BATCH_MIN, BATCH_MAX = 10, 20               # Files per burst batch
 BATCH_PAUSE_MIN, BATCH_PAUSE_MAX = 15, 30   # Cooldown between burst batches
-MAX_FILES_PER_CHANNEL = 100                  # Hard cap per channel per run
+MAX_FILES_PER_RUN = 100                      # Hard cap for the entire hourly run across all channels
 MIN_FILE_SIZE = 10 * 1024 * 1024             # 10 MB — accept almost any video file
 EXCLUDED_KEYWORDS = ["promo", "trailer", "sample", "1xbet", "sponsor"]
 ALLOWED_MIME_TYPES = {"video/mp4", "video/x-matroska", "video/webm", "video/avi",
@@ -613,7 +613,7 @@ def register_commands():
     log.info("  ✅ Owner commands registered")
 
 # ── Core T2T Logic ──
-async def t2t_forward_channel_files(conn, channel_data):
+async def t2t_forward_channel_files(conn, channel_data, remaining_limit):
     ch_id = channel_data["id"]
     link = channel_data["link"]
     last_msg_id = channel_data["last_msg_id"] or 0
@@ -759,7 +759,7 @@ async def t2t_forward_channel_files(conn, channel_data):
             size_mb = round(fsize / (1024*1024), 2) if fsize else 0
 
             # ── BURST SEND: tiny 1-2s delay between files within a batch ──
-            log.info(f"  📁 [run:{run_forwarded+1}/{MAX_FILES_PER_CHANNEL}] {fname} ({size_mb} MB)")
+            log.info(f"  📁 [run:{run_forwarded+1}/{remaining_limit}] {fname} ({size_mb} MB)")
             await asyncio.sleep(random.uniform(FILE_DELAY_MIN, FILE_DELAY_MAX))
 
             try:
@@ -794,9 +794,9 @@ async def t2t_forward_channel_files(conn, channel_data):
                 files_in_batch = 0
                 batch_size = random.randint(BATCH_MIN, BATCH_MAX)
 
-            # ── HARD CAP: 100 files per run ──
-            if run_forwarded >= MAX_FILES_PER_CHANNEL:
-                log.info(f"  🛑 Hit {MAX_FILES_PER_CHANNEL}-file limit for this run.")
+            # ── HARD CAP: limit files per run ──
+            if run_forwarded >= remaining_limit:
+                log.info(f"  🛑 Hit limit for this channel (remaining global allowance: {remaining_limit}).")
                 hit_limit = True
                 channel_exhausted = False
                 break
@@ -859,7 +859,7 @@ async def t2t_run_pipeline():
     log.info(f"\n{'═'*58}")
     log.info(f"  🤖 T2T PIPELINE — STRICT Clock Sync Mode")
     log.info(f"  ⏰ Runs at the top of EVERY hour (XX:00)")
-    log.info(f"  📦 Max {MAX_FILES_PER_CHANNEL} files per channel per run")
+    log.info(f"  📦 Max {MAX_FILES_PER_RUN} files TOTAL per run across all channels")
     log.info(f"  📦 Batch: {BATCH_MIN}-{BATCH_MAX} files, then {BATCH_PAUSE_MIN}-{BATCH_PAUSE_MAX}s pause")
     log.info(f"  📦 Min file size: {MIN_FILE_SIZE//(1024*1024)}MB")
     log.info(f"{'═'*58}")
@@ -909,40 +909,47 @@ async def t2t_run_pipeline():
 
         t2t_ensure_tables(conn)
         
+        hourly_total_forwarded = 0
+        
         # Loop over ALL pending/stale channels for this hour
-        while True:
+        while hourly_total_forwarded < MAX_FILES_PER_RUN:
             channel = t2t_fetch_next_channel(conn)
             if not channel:
-                log.info(f"  📭 All channels processed. No more pending channels.")
+                log.info(f"  📭 No more eligible files/channels")
                 break
 
             log.info(f"\n{'━'*55}")
             log.info(f"  🎯 Target: {channel['title'] or channel['link']}")
+            log.info(f"  📊 Hourly progress: {hourly_total_forwarded}/{MAX_FILES_PER_RUN} files")
             log.info(f"  📊 Previously forwarded: {channel['forwarded']} | Resume from msg: {channel['last_msg_id']}")
+            
+            remaining_limit = MAX_FILES_PER_RUN - hourly_total_forwarded
+            log.info(f"  📦 Remaining global allowance: {remaining_limit}")
             log.info(f"{'━'*55}")
 
             try:
-                success, run_forwarded = await t2t_forward_channel_files(conn, channel)
+                success, channel_forwarded = await t2t_forward_channel_files(conn, channel, remaining_limit)
             except Exception as e:
                 log.error(f"  💥 Pipeline error: {e}")
                 import traceback
                 traceback.print_exc()
                 success = False
-                run_forwarded = 0
+                channel_forwarded = 0
+
+            hourly_total_forwarded += channel_forwarded
 
             if success:
-                log.info(f"  ✅ Channel batch completed successfully.")
+                log.info(f"  ✅ Channel {channel['title'] or channel['link']}: {channel_forwarded} files forwarded")
             else:
                 log.info(f"  ⏩ Channel failed/skipped.")
                 
-            if run_forwarded > 0:
-                log.info(f"  Forwarded {run_forwarded} files. Status marked 'done'. Resting for 1 hour to prevent FloodWait.")
-                t2t_update_channel(conn, channel["id"], status="done", completed_at=datetime.utcnow())
-                await asyncio.sleep(3600)
-            else:
-                log.info("  No new files found. Status marked 'done'. Fast skipping to next channel.")
-                t2t_update_channel(conn, channel["id"], status="done", completed_at=datetime.utcnow())
-                continue
+            log.info(f"  📊 Hourly total: {hourly_total_forwarded}/{MAX_FILES_PER_RUN}")
+            
+            if hourly_total_forwarded >= MAX_FILES_PER_RUN:
+                log.info(f"  🛑 Global hourly limit reached: {MAX_FILES_PER_RUN}/{MAX_FILES_PER_RUN}")
+                break
+
+        log.info(f"  📊 Hourly run finished: {hourly_total_forwarded}/{MAX_FILES_PER_RUN} files forwarded")
 
         db_utils.close_db_connection(conn)
 
