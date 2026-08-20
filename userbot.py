@@ -33,7 +33,7 @@ CHANNEL_COOLDOWN = 3600
 FILE_DELAY_MIN, FILE_DELAY_MAX = 1, 2       # Fast burst: tiny gap between files in a batch
 BATCH_MIN, BATCH_MAX = 10, 20               # Files per burst batch
 BATCH_PAUSE_MIN, BATCH_PAUSE_MAX = 15, 30   # Cooldown between burst batches
-MAX_FILES_PER_CHANNEL = 100                  # Hard cap per channel per run
+MAX_FILES_PER_RUN = 100                      # Total files to forward per hourly run (across ALL channels)
 MIN_MSG_GAP = 5                              # Min gap for text commands only
 _last_msg_time = 0.0
 is_paused = False
@@ -228,8 +228,9 @@ async def safe_send_message(entity, text, **kwargs):
             return result
         except errors.FloodWaitError as e:
             w = e.seconds + random.randint(5, 15)
-            log.warning(f"  ⚠️ FLOOD WAIT: {w}s")
+            log.warning(f"  ⚠️ FLOOD WAIT: {w}s — checking account health...")
             await asyncio.sleep(w)
+            await safety_check()  # SpamBot check on FloodWait
         except Exception as e:
             log.error(f"  ❌ Send error ({attempt+1}/3): {e}")
             if attempt < 2:
@@ -246,8 +247,9 @@ async def safe_send_file(entity, file, **kwargs):
             return result
         except errors.FloodWaitError as e:
             w = e.seconds + random.randint(5, 15)
-            log.warning(f"  ⚠️ FLOOD WAIT on send_file: {w}s")
+            log.warning(f"  ⚠️ FLOOD WAIT on send_file: {w}s — checking account health...")
             await asyncio.sleep(w)
+            await safety_check()  # SpamBot check on FloodWait
         except Exception as e:
             log.error(f"  ❌ send_file error ({attempt+1}/3): {e}")
             if attempt < 2:
@@ -383,10 +385,18 @@ def register_commands():
     log.info("  ✅ Owner commands registered")
 
 # ── Core T2T Logic ──
-async def t2t_forward_channel_files(conn, channel_data):
+async def t2t_forward_channel_files(conn, channel_data, budget):
+    """
+    Forward video files from a single channel to the bot.
+    budget: max files we can forward in this call (shared hourly quota).
+    Returns: number of files actually forwarded this call.
+    """
     ch_id = channel_data["id"]
     link = channel_data["link"]
     last_msg_id = channel_data["last_msg_id"] or 0
+
+    if budget <= 0:
+        return 0
 
     # Resolve channel
     try:
@@ -399,7 +409,7 @@ async def t2t_forward_channel_files(conn, channel_data):
     except Exception as e:
         log.error(f"  ❌ Cannot access channel '{link}': {e}")
         t2t_update_channel(conn, ch_id, status="failed", notes=f"Access error: {str(e)[:200]}")
-        return False
+        return 0
 
     # Get FlimfyBoxBot entity
     try:
@@ -407,7 +417,7 @@ async def t2t_forward_channel_files(conn, channel_data):
     except Exception as e:
         log.error(f"  ❌ Cannot resolve @{FLIMFYBOX_BOT}: {e}")
         t2t_update_channel(conn, ch_id, status="failed", notes=f"Bot resolve error: {e}")
-        return False
+        return 0
 
     # Step 1: Send /superbatch
     log.info(f"  📤 Sending /superbatch to @{FLIMFYBOX_BOT}...")
@@ -415,18 +425,18 @@ async def t2t_forward_channel_files(conn, channel_data):
     if not sb:
         log.error("  ❌ Failed to send /superbatch")
         t2t_update_channel(conn, ch_id, status="failed", notes="superbatch send failed")
-        return False
+        return 0
     await asyncio.sleep(random.uniform(5, 10))
 
     # Step 2: Iterate channel messages (oldest-first) — BURST BATCH MODE
-    log.info(f"  📡 Scanning channel messages (from msg_id > {last_msg_id})...")
-    run_forwarded = 0          # Files forwarded THIS run (resets each cycle, capped at 100)
-    total_forwarded = channel_data["forwarded"] or 0  # Lifetime counter
+    log.info(f"  📡 Scanning channel messages (from msg_id > {last_msg_id}) | Budget: {budget} files...")
+    run_forwarded = 0
+    total_forwarded = channel_data["forwarded"] or 0
     batch_count = 0
     batch_size = random.randint(BATCH_MIN, BATCH_MAX)
     files_in_batch = 0
     hit_limit = False
-    channel_exhausted = True   # True if we run out of messages naturally
+    channel_exhausted = True
 
     try:
         async for message in client.iter_messages(entity, reverse=True, min_id=last_msg_id):
@@ -450,7 +460,7 @@ async def t2t_forward_channel_files(conn, channel_data):
             size_mb = round(fsize / (1024*1024), 2) if fsize else 0
 
             # ── BURST SEND: tiny 1-2s delay between files within a batch ──
-            log.info(f"  📁 [run:{run_forwarded+1}/{MAX_FILES_PER_CHANNEL}] {fname} ({size_mb} MB)")
+            log.info(f"  📁 [ch:{run_forwarded+1} | budget left:{budget - run_forwarded}] {fname} ({size_mb} MB)")
             await asyncio.sleep(random.uniform(FILE_DELAY_MIN, FILE_DELAY_MAX))
 
             try:
@@ -485,14 +495,13 @@ async def t2t_forward_channel_files(conn, channel_data):
                 files_in_batch = 0
                 batch_size = random.randint(BATCH_MIN, BATCH_MAX)
 
-            # ── HARD CAP: 100 files per run ──
-            if run_forwarded >= MAX_FILES_PER_CHANNEL:
-                log.info(f"  🛑 Hit {MAX_FILES_PER_CHANNEL}-file limit for this run.")
+            # ── BUDGET CAP: stop when hourly budget is used up ──
+            if run_forwarded >= budget:
+                log.info(f"  🛑 Hourly budget ({budget} files) used up for this channel.")
                 hit_limit = True
                 channel_exhausted = False
                 break
 
-        # If loop finished naturally without hitting limit
         if not hit_limit:
             channel_exhausted = True
 
@@ -500,14 +509,14 @@ async def t2t_forward_channel_files(conn, channel_data):
         log.error(f"  ❌ Channel is private/inaccessible: {link}")
         t2t_update_channel(conn, ch_id, status="failed", notes="Channel private/inaccessible",
                            last_forwarded_msg_id=last_msg_id, total_files_forwarded=total_forwarded)
-        return False
+        return run_forwarded
     except Exception as e:
         log.error(f"  ❌ Channel iteration error: {e}")
         t2t_update_channel(conn, ch_id, status="failed", notes=f"Iteration error: {str(e)[:200]}",
                            last_forwarded_msg_id=last_msg_id, total_files_forwarded=total_forwarded)
-        return False
+        return run_forwarded
 
-    # Step 3: Send /superdone (always, whether limit hit or channel exhausted)
+    # Step 3: Send /superdone
     log.info(f"  📤 Sending /superdone to @{FLIMFYBOX_BOT}...")
     await asyncio.sleep(random.uniform(3, 6))
     await safe_send_message(flimfy_bot, "/superdone")
@@ -515,18 +524,16 @@ async def t2t_forward_channel_files(conn, channel_data):
 
     # Update channel status
     if channel_exhausted:
-        # All files in channel processed — mark done
         t2t_update_channel(conn, ch_id, status="done", completed_at=datetime.now(),
                            last_forwarded_msg_id=last_msg_id, total_files_forwarded=total_forwarded)
         log.info(f"  🎉 Channel '{title}' FULLY DONE! {total_forwarded} total files forwarded.")
     else:
-        # Hit 100-file limit — keep as pending for next cycle
         t2t_update_channel(conn, ch_id, status="pending",
                            last_forwarded_msg_id=last_msg_id, total_files_forwarded=total_forwarded)
-        log.info(f"  ⏸️ Channel '{title}' paused at {total_forwarded} files. Will resume next cycle.")
+        log.info(f"  ⏸️ Channel '{title}' budget exhausted at {total_forwarded} files. Will resume next cycle.")
 
-    log.info(f"  📊 This run: {run_forwarded} files | Lifetime: {total_forwarded} files")
-    return True
+    log.info(f"  📊 This channel: {run_forwarded} files | Lifetime: {total_forwarded} files")
+    return run_forwarded
 
 # ── Main Pipeline (STRICT Clock Sync Mode) ──
 def _seconds_until_next_hour():
@@ -543,7 +550,7 @@ async def t2t_run_pipeline():
     log.info(f"\n{'═'*58}")
     log.info(f"  🤖 T2T PIPELINE — STRICT Clock Sync Mode")
     log.info(f"  ⏰ Runs at the top of EVERY hour (XX:00)")
-    log.info(f"  📦 Max {MAX_FILES_PER_CHANNEL} files per channel per run")
+    log.info(f"  📦 Hourly budget: {MAX_FILES_PER_RUN} files (shared across ALL channels)")
     log.info(f"  📦 Batch: {BATCH_MIN}-{BATCH_MAX} files, then {BATCH_PAUSE_MIN}-{BATCH_PAUSE_MAX}s pause")
     log.info(f"{'═'*58}")
 
@@ -573,36 +580,50 @@ async def t2t_run_pipeline():
         conn = db_utils.get_db_connection()
         if not conn:
             log.error("  ❌ DB connection failed!")
-            # Still sleep until next hour
             await asyncio.sleep(_seconds_until_next_hour())
             continue
 
         t2t_ensure_tables(conn)
-        channel = t2t_fetch_next_channel(conn)
 
-        if not channel:
-            db_utils.close_db_connection(conn)
-            log.info(f"  📭 No pending channels (all 'done' channels completed within 24h). Will recheck next hour.")
-        else:
+        # ── Multi-channel loop: keep going until budget used or no more pending ──
+        hourly_budget = MAX_FILES_PER_RUN
+        total_this_run = 0
+        channels_done = 0
+
+        while hourly_budget > 0:
+            if is_paused:
+                await wait_for_resume()
+
+            channel = t2t_fetch_next_channel(conn)
+            if not channel:
+                log.info(f"  📭 No more pending channels. Run complete.")
+                break
+
             log.info(f"\n{'━'*55}")
             log.info(f"  🎯 Target: {channel['title'] or channel['link']}")
             log.info(f"  📊 Previously forwarded: {channel['forwarded']} | Resume from msg: {channel['last_msg_id']}")
+            log.info(f"  🎫 Budget remaining this hour: {hourly_budget} files")
             log.info(f"{'━'*55}")
 
             try:
-                success = await t2t_forward_channel_files(conn, channel)
+                forwarded = await t2t_forward_channel_files(conn, channel, budget=hourly_budget)
             except Exception as e:
                 log.error(f"  💥 Pipeline error: {e}")
                 import traceback
                 traceback.print_exc()
-                success = False
+                forwarded = 0
 
-            db_utils.close_db_connection(conn)
+            hourly_budget -= forwarded
+            total_this_run += forwarded
+            channels_done += 1
+            log.info(f"  ✅ Channel done. Forwarded: {forwarded} | Hourly budget left: {hourly_budget}")
 
-            if success:
-                log.info(f"  ✅ Channel batch completed successfully.")
-            else:
-                log.info(f"  ⏩ Channel failed/skipped.")
+            if hourly_budget <= 0:
+                log.info(f"  🛑 Hourly budget of {MAX_FILES_PER_RUN} files fully used. Sleeping until next hour.")
+                break
+
+        db_utils.close_db_connection(conn)
+        log.info(f"\n  📊 Run #{run} summary: {total_this_run} files forwarded across {channels_done} channel(s).")
 
         # ── STRICT Clock Sync: sleep until the NEXT hour starts ──
         wait_secs = _seconds_until_next_hour()
@@ -619,16 +640,40 @@ async def t2t_run_pipeline():
             await asyncio.sleep(chunk)
             slept += chunk
 
-# ── Safety Check ──
+# ── Safety Check (via @SpamBot) ──
+_SPAMBOT_RESTRICT_KEYWORDS = [
+    "limited", "spam", "restrictions", "reported", "banned",
+    "unfortunately", "complaint", "cannot"
+]
+_SPAMBOT_SAFE_KEYWORDS = [
+    "no limits", "good standing", "free", "not limited", "no complaints"
+]
+
 async def safety_check():
-    me = await client.get_me()
-    log.info(f"  📱 Account: {me.first_name} (@{me.username or 'N/A'})")
-    log.info(f"  🆔 ID: {me.id}")
-    if hasattr(me, 'restricted') and me.restricted:
-        log.error("  🚫 ACCOUNT RESTRICTED!")
-        return False
-    log.info("  ✅ Account healthy")
-    return True
+    """Message @SpamBot, read its reply, and auto-pause if account is restricted."""
+    try:
+        log.info("  🔍 SpamBot check: messaging @SpamBot...")
+        spam_bot = await client.get_entity("SpamBot")
+        await client.send_message(spam_bot, "/start")
+        await asyncio.sleep(random.uniform(4, 7))
+        msgs = await client.get_messages(spam_bot, limit=1)
+        if not msgs or not msgs[0].text:
+            log.warning("  ⚠️ SpamBot gave no reply — skipping health check")
+            return True
+        reply_text = msgs[0].text.lower()
+        log.info(f"  📨 SpamBot says: {msgs[0].text[:120]}")
+        is_restricted = any(kw in reply_text for kw in _SPAMBOT_RESTRICT_KEYWORDS)
+        is_safe = any(kw in reply_text for kw in _SPAMBOT_SAFE_KEYWORDS)
+        if is_restricted and not is_safe:
+            log.error("  🚫 ACCOUNT RESTRICTED! Auto-pausing bot...")
+            await trigger_pause(f"SpamBot restriction detected: {msgs[0].text[:200]}")
+            return False
+        else:
+            log.info("  ✅ Account healthy (SpamBot confirmed)")
+            return True
+    except Exception as e:
+        log.warning(f"  ⚠️ SpamBot check failed: {e} — continuing anyway")
+        return True
 
 # ── Entry Point ──
 async def start_t2t_worker():
