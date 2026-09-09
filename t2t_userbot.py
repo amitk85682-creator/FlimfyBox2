@@ -121,7 +121,7 @@ def t2t_fetch_next_channel(conn):
     # 1. First try to find a channel with status='pending'
     cur.execute("""
         SELECT id, channel_link, channel_id, channel_title, last_forwarded_msg_id,
-               total_files_found, total_files_forwarded
+               total_files_found, total_files_forwarded, forward_to
         FROM t2t_channels WHERE status = 'pending'
         ORDER BY priority DESC, id ASC LIMIT 1
     """)
@@ -129,13 +129,13 @@ def t2t_fetch_next_channel(conn):
     if row:
         cur.close()
         return {"id": row[0], "link": row[1], "channel_id": row[2], "title": row[3],
-                "last_msg_id": row[4], "found": row[5], "forwarded": row[6]}
+                "last_msg_id": row[4], "found": row[5], "forwarded": row[6], "forward_to": row[7]}
 
     # 2. No pending channels — look for 'done' channels completed > 50 mins ago
     fifty_mins_ago = datetime.utcnow() - timedelta(minutes=50)
     cur.execute("""
         SELECT id, channel_link, channel_id, channel_title, last_forwarded_msg_id,
-               total_files_found, total_files_forwarded
+               total_files_found, total_files_forwarded, forward_to
         FROM t2t_channels
         WHERE status = 'done'
           AND completed_at IS NOT NULL
@@ -154,7 +154,7 @@ def t2t_fetch_next_channel(conn):
     t2t_update_channel(conn, ch_id, status="pending", completed_at=None)
 
     return {"id": row[0], "link": row[1], "channel_id": row[2], "title": row[3],
-            "last_msg_id": row[4], "found": row[5], "forwarded": row[6]}
+            "last_msg_id": row[4], "found": row[5], "forwarded": row[6], "forward_to": row[7]}
 
 def t2t_update_channel(conn, ch_id, **kwargs):
     cur = conn.cursor()
@@ -672,11 +672,19 @@ async def t2t_forward_channel_files(conn, channel_data, remaining_limit):
         t2t_update_channel(conn, ch_id, status="failed", notes=f"State update error: {str(e)[:200]}")
         return False, 0
 
-    # Get FlimfyBoxBot entity
+    forward_to = channel_data.get("forward_to")
+    if not forward_to:
+        log.error(f"  ❌ Channel '{title}' has no forward_to destination configured.")
+        t2t_update_channel(conn, ch_id, status="failed", notes="No forward_to destination configured")
+        return False, 0
+
+    forward_to = forward_to.strip()
+
+    # Get target bot entity
     try:
-        flimfy_bot = await client.get_entity(FLIMFYBOX_BOT)
+        target_bot = await client.get_entity(forward_to)
     except Exception as e:
-        log.error(f"  ❌ Cannot resolve @{FLIMFYBOX_BOT}: {e}")
+        log.error(f"  ❌ Cannot resolve @{forward_to}: {e}")
         t2t_update_channel(conn, ch_id, status="failed", notes=f"Bot resolve error: {e}")
         return False, 0
 
@@ -760,8 +768,8 @@ async def t2t_forward_channel_files(conn, channel_data, remaining_limit):
     log.info(f"  ✅ Pre-scan found {scan_count}+ valid files. Proceeding with /superbatch...")
 
     # Step 2: Send /superbatch
-    log.info(f"  📤 Sending /superbatch to @{FLIMFYBOX_BOT}...")
-    sb = await safe_send_message(flimfy_bot, "/superbatch")
+    log.info(f"  📤 Sending /superbatch to @{forward_to}...")
+    sb = await safe_send_message(target_bot, "/superbatch")
     if not sb:
         log.error("  ❌ Failed to send /superbatch")
         t2t_update_channel(conn, ch_id, status="failed", notes="superbatch send failed")
@@ -806,7 +814,7 @@ async def t2t_forward_channel_files(conn, channel_data, remaining_limit):
             try:
                 doc = message.media.document
                 caption = message.text or message.message or ""
-                sent = await safe_send_file(flimfy_bot, file=doc, caption=caption, force_document=False)
+                sent = await safe_send_file(target_bot, file=doc, caption=caption, force_document=False)
                 if sent:
                     run_forwarded += 1
                     total_forwarded += 1
@@ -859,15 +867,15 @@ async def t2t_forward_channel_files(conn, channel_data, remaining_limit):
 
     # Step 3: Send /superdone ONLY if files were actually forwarded
     if run_forwarded > 0:
-        log.info(f"  📤 Sending /superdone to @{FLIMFYBOX_BOT} ({run_forwarded} files forwarded)...")
+        log.info(f"  📤 Sending /superdone to @{forward_to} ({run_forwarded} files forwarded)...")
         await asyncio.sleep(random.uniform(3, 6))
-        await safe_send_message(flimfy_bot, "/superdone")
+        await safe_send_message(target_bot, "/superdone")
         await asyncio.sleep(random.uniform(2, 4))
     else:
         log.warning(f"  ⚠️ 0 files forwarded — SKIPPING /superdone (no need to trigger empty batch)")
         # Cancel superbatch since no files were sent
         await asyncio.sleep(random.uniform(1, 3))
-        await safe_send_message(flimfy_bot, "/superdone")
+        await safe_send_message(target_bot, "/superdone")
         await asyncio.sleep(random.uniform(1, 2))
 
     # Update channel status
