@@ -73,9 +73,10 @@ def t2t_ensure_tables(conn):
     cur.execute("""
         CREATE TABLE IF NOT EXISTS t2t_channels (
             id SERIAL PRIMARY KEY,
-            channel_link TEXT NOT NULL UNIQUE,
+            channel_link TEXT UNIQUE,
             channel_id BIGINT,
             channel_title TEXT,
+            forward_to TEXT,
             status TEXT DEFAULT 'pending',
             priority INTEGER DEFAULT 0,
             last_forwarded_msg_id INTEGER DEFAULT 0,
@@ -614,43 +615,31 @@ def register_commands():
 
 # ── Core T2T Logic ──
 async def resolve_t2t_channel(channel_data):
-    """Resolve channel entity using stored ID first, fallback to invite link."""
+    """Resolve channel entity using stored ID."""
     stored_id = channel_data.get("channel_id")
-    link = channel_data.get("link")
     
-    entity = None
-    
-    # 1. Try resolving using stored channel_id from joined dialogs
-    if stored_id:
-        try:
-            async for dialog in client.iter_dialogs():
-                if getattr(dialog.entity, "id", None) == stored_id:
-                    entity = dialog.entity
-                    log.info(f"  ✅ Channel resolved from joined dialogs using stored Telegram ID")
-                    break
-        except Exception as e:
-            log.warning(f"  ⚠️ Dialog search error for ID {stored_id}: {e}")
+    if not stored_id:
+        log.error("  ❌ No channel_id configured")
+        return None
+        
+    try:
+        async for dialog in client.iter_dialogs():
+            if getattr(dialog.entity, "id", None) == stored_id:
+                log.info(f"  ✅ Channel resolved from joined dialogs using stored Telegram ID")
+                return dialog.entity
+    except Exception as e:
+        log.warning(f"  ⚠️ Dialog search error for ID {stored_id}: {e}")
             
-    if entity is None and stored_id:
-        log.warning(f"  ⚠️ Stored channel ID not found in current joined dialogs")
-
-    # 2. Fallback to invite link if entity is still None
-    if entity is None and link:
-        try:
-            entity = await client.get_entity(link)
-            log.info(f"  ✅ Channel resolved using channel link")
-        except Exception as e:
-            log.error(f"  ❌ Unable to access channel using original link '{link}': {e}")
-            return None
-            
-    return entity
+    log.warning(f"  ⚠️ Stored channel ID not found in current joined dialogs")
+    return None
 
 async def t2t_forward_channel_files(conn, channel_data, remaining_limit):
     ch_id = channel_data["id"]
-    link = channel_data["link"]
+    link = channel_data.get("link")
     last_msg_id = channel_data["last_msg_id"] or 0
+    title_display = channel_data.get("title") or link or str(channel_data.get("channel_id"))
 
-    log.info(f"  🔎 Resolving channel: {channel_data.get('title') or link}")
+    log.info(f"  🔎 Resolving channel: {title_display}")
     if channel_data.get("channel_id"):
         log.info(f"  🆔 Stored Telegram channel ID: {channel_data['channel_id']}")
 
@@ -658,12 +647,12 @@ async def t2t_forward_channel_files(conn, channel_data, remaining_limit):
     entity = await resolve_t2t_channel(channel_data)
     
     if not entity:
-        log.error(f"  ❌ Unable to access channel using stored ID or original link")
-        t2t_update_channel(conn, ch_id, status="failed", notes="Channel inaccessible (both ID and link failed)")
+        log.error(f"  ❌ Unable to access channel using stored channel_id")
+        t2t_update_channel(conn, ch_id, status="failed", notes="Channel inaccessible (ID failed)")
         return False, 0
         
     try:
-        title = getattr(entity, 'title', link)
+        title = getattr(entity, 'title', title_display)
         resolved_id = entity.id
         t2t_update_channel(conn, ch_id, channel_id=resolved_id, channel_title=title,
                            status="processing", started_at=datetime.utcnow())
