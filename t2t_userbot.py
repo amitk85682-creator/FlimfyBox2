@@ -35,9 +35,9 @@ SESSION_STRING = os.environ.get("USERBOT_SESSION", "")
 FLIMFYBOX_BOT = "FlimfyBoxBot"
 CHANNEL_COOLDOWN = 3600
 FILE_DELAY_MIN, FILE_DELAY_MAX = 1, 2       # Fast burst: tiny gap between files in a batch
-BATCH_MIN, BATCH_MAX = 10, 20               # Files per burst batch
-BATCH_PAUSE_MIN, BATCH_PAUSE_MAX = 15, 30   # Cooldown between burst batches
-MAX_FILES_PER_RUN = 250                      # Hard cap for the entire hourly run across all channels
+BATCH_MIN, BATCH_MAX = 20, 20               # Files per burst batch
+BATCH_PAUSE_MIN, BATCH_PAUSE_MAX = 5, 10   # Cooldown between burst batches
+MAX_FILES_PER_RUN = 400                      # Hard cap for the entire hourly run across all channels
 MIN_FILE_SIZE = 10 * 1024 * 1024             # 10 MB — accept almost any video file
 EXCLUDED_KEYWORDS = ["promo", "trailer", "sample", "1xbet", "sponsor"]
 ALLOWED_MIME_TYPES = {"video/mp4", "video/x-matroska", "video/webm", "video/avi",
@@ -798,7 +798,6 @@ async def t2t_forward_channel_files(conn, channel_data, remaining_limit):
 
             # ── BURST SEND: tiny 1-2s delay between files within a batch ──
             log.info(f"  📁 [run:{run_forwarded+1}/{remaining_limit}] {fname} ({size_mb} MB)")
-            await asyncio.sleep(random.uniform(FILE_DELAY_MIN, FILE_DELAY_MAX))
 
             try:
                 doc = message.media.document
