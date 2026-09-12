@@ -6094,6 +6094,8 @@ async def superbatch_done(update: Update, context: ContextTypes.DEFAULT_TYPE):
     SUPER_BATCH_SESSION.update({'active': False, 'admin_id': None, 'files': []})
 
 async def pm_file_listener(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    if update.effective_user is None:
+        return
     # 🛡️ Ye line add karo (Line 2145 ke aas-paas)
     if BATCH_18_SESSION.get('active') or SUPER_BATCH_SESSION.get('active'):
         return

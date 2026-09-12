@@ -633,7 +633,7 @@ async def resolve_t2t_channel(channel_data):
     log.warning(f"  ⚠️ Stored channel ID not found in current joined dialogs")
     return None
 
-async def t2t_forward_channel_files(conn, channel_data, remaining_limit):
+async def t2t_forward_channel_files(conn, channel_data, remaining_limit, active_batches):
     ch_id = channel_data["id"]
     link = channel_data.get("link")
     last_msg_id = channel_data["last_msg_id"] or 0
@@ -756,14 +756,16 @@ async def t2t_forward_channel_files(conn, channel_data, remaining_limit):
     
     log.info(f"  ✅ Pre-scan found {scan_count}+ valid files. Proceeding with /superbatch...")
 
-    # Step 2: Send /superbatch
-    log.info(f"  📤 Sending /superbatch to @{forward_to}...")
-    sb = await safe_send_message(target_bot, "/superbatch")
-    if not sb:
-        log.error("  ❌ Failed to send /superbatch")
-        t2t_update_channel(conn, ch_id, status="failed", notes="superbatch send failed")
-        return False, 0
-    await asyncio.sleep(random.uniform(5, 10))
+    # Step 2: Send /superbatch if not already active for this target bot
+    if forward_to not in active_batches:
+        log.info(f"  📤 Sending /superbatch to @{forward_to}...")
+        sb = await safe_send_message(target_bot, "/superbatch")
+        if not sb:
+            log.error("  ❌ Failed to send /superbatch")
+            t2t_update_channel(conn, ch_id, status="failed", notes="superbatch send failed")
+            return False, 0
+        await asyncio.sleep(5.0)
+        active_batches[forward_to] = target_bot
 
     # Step 3: Iterate channel messages (oldest-first) — BURST BATCH MODE
     log.info(f"  📡 Forwarding files from channel (from msg_id > {effective_min_id})...")
@@ -853,19 +855,6 @@ async def t2t_forward_channel_files(conn, channel_data, remaining_limit):
                            last_forwarded_msg_id=last_msg_id, total_files_forwarded=total_forwarded)
         return False, run_forwarded
 
-    # Step 3: Send /superdone ONLY if files were actually forwarded
-    if run_forwarded > 0:
-        log.info(f"  📤 Sending /superdone to @{forward_to} ({run_forwarded} files forwarded)...")
-        await asyncio.sleep(random.uniform(3, 6))
-        await safe_send_message(target_bot, "/superdone")
-        await asyncio.sleep(random.uniform(2, 4))
-    else:
-        log.warning(f"  ⚠️ 0 files forwarded — SKIPPING /superdone (no need to trigger empty batch)")
-        # Cancel superbatch since no files were sent
-        await asyncio.sleep(random.uniform(1, 3))
-        await safe_send_message(target_bot, "/superdone")
-        await asyncio.sleep(random.uniform(1, 2))
-
     # Update channel status
     if channel_exhausted:
         # All files in channel processed — mark done
@@ -947,6 +936,7 @@ async def t2t_run_pipeline():
         t2t_ensure_tables(conn)
         
         hourly_total_forwarded = 0
+        active_batches = {}
         
         # Loop over ALL pending/stale channels for this hour
         while hourly_total_forwarded < MAX_FILES_PER_RUN:
@@ -965,7 +955,7 @@ async def t2t_run_pipeline():
             log.info(f"{'━'*55}")
 
             try:
-                success, channel_forwarded = await t2t_forward_channel_files(conn, channel, remaining_limit)
+                success, channel_forwarded = await t2t_forward_channel_files(conn, channel, remaining_limit, active_batches)
             except Exception as e:
                 log.error(f"  💥 Pipeline error: {e}")
                 import traceback
@@ -987,6 +977,12 @@ async def t2t_run_pipeline():
                 break
 
         log.info(f"  📊 Hourly run finished: {hourly_total_forwarded}/{MAX_FILES_PER_RUN} files forwarded")
+
+        for target_name, bot_entity in active_batches.items():
+            log.info(f"  📤 Sending /superdone to @{target_name} at end of hourly run...")
+            await asyncio.sleep(random.uniform(3, 6))
+            await safe_send_message(bot_entity, "/superdone")
+            await asyncio.sleep(random.uniform(2, 4))
 
         db_utils.close_db_connection(conn)
 
