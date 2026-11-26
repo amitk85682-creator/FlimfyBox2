@@ -221,6 +221,30 @@ def t2t_is_already_forwarded(conn, ch_id, msg_id):
     cur.close()
     return r is not None
 
+def t2t_find_recent_main_batch(conn, bot_id):
+    """Return a recently active main-bot batch from the shared database."""
+    cur = conn.cursor()
+    try:
+        cur.execute(
+            """
+            SELECT b.id, b.kind, b.movie_id, m.title
+            FROM ingestion_batches AS b
+            LEFT JOIN movies AS m ON m.id = b.movie_id
+            WHERE b.status = 'collecting'
+              AND b.updated_at >= CURRENT_TIMESTAMP - INTERVAL '2 hours'
+              AND (b.bot_id = %s OR b.bot_id IS NULL)
+            ORDER BY b.updated_at DESC
+            LIMIT 1
+            """,
+            (bot_id,),
+        )
+        return cur.fetchone()
+    except Exception:
+        conn.rollback()
+        raise
+    finally:
+        cur.close()
+
 def t2t_reconcile_batch(conn, ch_id, batch_id):
     """Map the bot's durable item states back to source-channel messages."""
     cur = conn.cursor()
@@ -656,6 +680,32 @@ async def t2t_forward_channel_files(conn, channel_data, budget):
         log.error(f"  ❌ Cannot resolve @{FLIMFYBOX_BOT}: {e}")
         t2t_update_channel(conn, ch_id, status="failed", notes=f"Bot resolve error: {e}")
         return 0
+
+    # Read the same DB state used by the main bot before asking it to open a batch.
+    # This avoids even sending a command while a recent manual collector owns uploads.
+    try:
+        active_batch = t2t_find_recent_main_batch(conn, getattr(flimfy_bot, "id", None))
+    except Exception as e:
+        log.warning("  ⚠️ Shared main-bot batch state unavailable (%s); deferring channel", type(e).__name__)
+        t2t_update_channel(
+            conn, ch_id, status="pending",
+            notes="Waiting for shared main-bot batch state",
+        )
+        return None
+
+    if active_batch:
+        active_id, active_kind, active_movie_id, active_title = active_batch
+        batch_label = active_title or active_kind or "batch"
+        log.info(
+            "  ⏸️ Main bot already has a collecting batch "
+            "(batch_id=%s, title=%s); deferring source channel",
+            active_id, batch_label,
+        )
+        t2t_update_channel(
+            conn, ch_id, status="pending",
+            notes=f"Waiting for main-bot batch {active_id} to finish",
+        )
+        return None
 
     # Step 1: Start only after this exact /superbatch request is accepted.
     log.info(f"  📤 Sending /superbatch to @{FLIMFYBOX_BOT}...")
