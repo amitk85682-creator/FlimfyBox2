@@ -229,11 +229,31 @@ def t2t_reconcile_batch(conn, ch_id, batch_id):
         batch = cur.fetchone()
         if not batch:
             cur.execute(
-                "SELECT MIN(original_msg_id) FROM t2t_forward_log "
-                "WHERE channel_id = %s AND bot_batch_id = %s",
+                "SELECT MIN(original_msg_id), "
+                "BOOL_OR(status IN ('sending', 'awaiting_bot', 'forwarded') "
+                "OR bot_message_id IS NOT NULL) "
+                "FROM t2t_forward_log WHERE channel_id = %s AND bot_batch_id = %s",
                 (ch_id, batch_id),
             )
-            first_source_id = cur.fetchone()[0]
+            first_source_id, delivery_uncertain = cur.fetchone()
+            if delivery_uncertain:
+                cur.execute(
+                    "UPDATE t2t_forward_log SET status = 'needs_review' "
+                    "WHERE channel_id = %s AND bot_batch_id = %s "
+                    "AND (status IN ('sending', 'awaiting_bot', 'forwarded') "
+                    "OR bot_message_id IS NOT NULL)",
+                    (ch_id, batch_id),
+                )
+                cur.execute(
+                    "UPDATE t2t_channels SET status = 'failed', scan_exhausted = FALSE, "
+                    "pending_batch_id = NULL, completed_at = NULL, "
+                    "notes = 'Main-bot batch record missing after Telegram delivery; manual review required' "
+                    "WHERE id = %s",
+                    (ch_id,),
+                )
+                conn.commit()
+                return "needs_review"
+
             retry_from = max(0, first_source_id - 1) if first_source_id else 0
             cur.execute(
                 "UPDATE t2t_forward_log SET status = 'retryable' "
@@ -243,7 +263,7 @@ def t2t_reconcile_batch(conn, ch_id, batch_id):
             cur.execute(
                 "UPDATE t2t_channels SET status = 'pending', scan_exhausted = FALSE, "
                 "pending_batch_id = NULL, last_forwarded_msg_id = %s, "
-                "completed_at = NULL, notes = 'Main-bot checkpoint missing; source files will be resent' "
+                "completed_at = NULL, notes = 'Main-bot checkpoint missing before any delivery; source files will be resent' "
                 "WHERE id = %s",
                 (retry_from, ch_id),
             )
