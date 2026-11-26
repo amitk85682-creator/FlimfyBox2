@@ -107,54 +107,72 @@ def t2t_add_channel(conn, link):
         return None
 
 def t2t_fetch_next_channel(conn):
+    """Atomically lease one channel so multiple userbot workers cannot overlap."""
     cur = conn.cursor()
-    # 1. First try to find a channel with status='pending'
-    cur.execute("""
-        SELECT id, channel_link, channel_id, channel_title, last_forwarded_msg_id,
-               total_files_found, total_files_forwarded
-        FROM t2t_channels
-        WHERE status = 'pending'
-          AND pending_batch_id IS NULL
-          AND NOT EXISTS (
-              SELECT 1 FROM t2t_forward_log f
-              WHERE f.channel_id = t2t_channels.id AND f.status = 'awaiting_bot'
-          )
-        ORDER BY priority DESC, id ASC LIMIT 1
-    """)
-    row = cur.fetchone()
-    if row:
+    try:
+        cur.execute("""
+            WITH candidate AS (
+                SELECT c.id, c.status
+                FROM t2t_channels AS c
+                WHERE c.pending_batch_id IS NULL
+                  AND (
+                      c.status = 'pending'
+                      OR (
+                          c.status = 'done'
+                          AND c.completed_at IS NOT NULL
+                          AND c.completed_at < (CURRENT_TIMESTAMP - INTERVAL '24 hours')
+                      )
+                      OR (
+                          c.status = 'processing'
+                          AND c.started_at IS NOT NULL
+                          AND c.started_at < (CURRENT_TIMESTAMP - INTERVAL '2 hours')
+                      )
+                  )
+                  AND NOT EXISTS (
+                      SELECT 1 FROM t2t_forward_log AS f
+                      WHERE f.channel_id = c.id
+                        AND f.status IN ('awaiting_bot', 'sending')
+                  )
+                ORDER BY
+                    CASE c.status
+                        WHEN 'pending' THEN 0
+                        WHEN 'processing' THEN 1
+                        ELSE 2
+                    END,
+                    CASE WHEN c.status = 'done' THEN c.completed_at END ASC NULLS LAST,
+                    c.priority DESC,
+                    c.id ASC
+                LIMIT 1
+                FOR UPDATE SKIP LOCKED
+            )
+            UPDATE t2t_channels AS c
+            SET status = 'processing',
+                started_at = CURRENT_TIMESTAMP,
+                completed_at = CASE WHEN c.status = 'done' THEN NULL ELSE c.completed_at END,
+                notes = CASE
+                    WHEN c.status = 'processing' THEN 'Recovered stale userbot lease'
+                    ELSE NULL
+                END
+            FROM candidate
+            WHERE c.id = candidate.id
+            RETURNING c.id, c.channel_link, c.channel_id, c.channel_title,
+                      c.last_forwarded_msg_id, c.total_files_found,
+                      c.total_files_forwarded
+        """)
+        row = cur.fetchone()
+        conn.commit()
+    except Exception:
+        conn.rollback()
+        raise
+    finally:
         cur.close()
-        return {"id": row[0], "link": row[1], "channel_id": row[2], "title": row[3],
-                "last_msg_id": row[4], "found": row[5], "forwarded": row[6]}
 
-    # 2. No pending channels — look for 'done' channels completed > 24 hours ago
-    cur.execute("""
-        SELECT id, channel_link, channel_id, channel_title, last_forwarded_msg_id,
-               total_files_found, total_files_forwarded
-        FROM t2t_channels
-        WHERE status = 'done'
-          AND completed_at IS NOT NULL
-          AND pending_batch_id IS NULL
-          AND NOT EXISTS (
-              SELECT 1 FROM t2t_forward_log f
-              WHERE f.channel_id = t2t_channels.id AND f.status = 'awaiting_bot'
-          )
-          AND completed_at < (CURRENT_TIMESTAMP - INTERVAL '24 hours')
-        ORDER BY completed_at ASC LIMIT 1
-    """)
-    row = cur.fetchone()
-    cur.close()
     if not row:
         return None
-
-    # 3. Reset this stale 'done' channel back to 'pending' for reprocessing.
-    #    Preserve last_forwarded_msg_id so it resumes from where it left off.
-    ch_id = row[0]
-    log.info(f"  🔄 Auto-Recheck: Channel '{row[3] or row[1]}' (ID: {ch_id}) was done >24h ago. Resetting to pending.")
-    t2t_update_channel(conn, ch_id, status="pending", completed_at=None)
-
-    return {"id": row[0], "link": row[1], "channel_id": row[2], "title": row[3],
-            "last_msg_id": row[4], "found": row[5], "forwarded": row[6]}
+    return {
+        "id": row[0], "link": row[1], "channel_id": row[2], "title": row[3],
+        "last_msg_id": row[4], "found": row[5], "forwarded": row[6],
+    }
 
 def t2t_update_channel(conn, ch_id, **kwargs):
     cur = conn.cursor()
@@ -170,6 +188,7 @@ def t2t_update_channel(conn, ch_id, **kwargs):
 
 def t2t_log_forward(conn, ch_id, msg_id, filename, file_size, status="awaiting_bot",
                     bot_batch_id=None, bot_message_id=None):
+    """Persist a source-file checkpoint; callers must not send if this fails."""
     cur = conn.cursor()
     try:
         cur.execute("""INSERT INTO t2t_forward_log
@@ -184,16 +203,19 @@ def t2t_log_forward(conn, ch_id, msg_id, filename, file_size, status="awaiting_b
             (ch_id, msg_id, filename, file_size, status,
              bot_batch_id, bot_message_id))
         conn.commit()
+        return True
     except Exception as e:
         conn.rollback()
-        log.error(f"Log forward error: {e}")
-    cur.close()
+        log.error("Forward checkpoint failed (%s)", type(e).__name__)
+        return False
+    finally:
+        cur.close()
 
 def t2t_is_already_forwarded(conn, ch_id, msg_id):
     cur = conn.cursor()
     cur.execute("""SELECT 1 FROM t2t_forward_log
                     WHERE channel_id=%s AND original_msg_id=%s
-                      AND status IN ('forwarded', 'awaiting_bot', 'unrecoverable', 'needs_review')""",
+                      AND status IN ('forwarded', 'awaiting_bot', 'sending', 'unrecoverable', 'needs_review')""",
                 (ch_id, msg_id))
     r = cur.fetchone()
     cur.close()
@@ -237,7 +259,7 @@ def t2t_reconcile_batch(conn, ch_id, batch_id):
         )
         item_states = {row[0]: (row[1], row[2]) for row in cur.fetchall()}
         cur.execute(
-            "SELECT original_msg_id, bot_message_id FROM t2t_forward_log "
+            "SELECT original_msg_id, bot_message_id, status FROM t2t_forward_log "
             "WHERE channel_id = %s AND bot_batch_id = %s",
             (ch_id, batch_id),
         )
@@ -247,10 +269,13 @@ def t2t_reconcile_batch(conn, ch_id, batch_id):
         review_ids = []
         unrecoverable_ids = []
         pending_ids = []
-        for original_msg_id, bot_message_id in log_rows:
+        for original_msg_id, bot_message_id, log_status in log_rows:
             item = item_states.get(bot_message_id) if bot_message_id else None
             state, error_class = item if item else ("failed", None)
-            if state in {"succeeded", "skipped"}:
+            if log_status == "sending":
+                next_status = "needs_review"
+                review_ids.append(original_msg_id)
+            elif state in {"succeeded", "skipped"}:
                 next_status = "forwarded"
             elif state == "failed" and error_class == "AmbiguousMovieIdentity":
                 next_status = "needs_review"
@@ -326,7 +351,7 @@ def t2t_reconcile_pending_batches(conn):
             "SELECT id, pending_batch_id FROM t2t_channels WHERE pending_batch_id IS NOT NULL "
             "UNION "
             "SELECT DISTINCT channel_id, bot_batch_id FROM t2t_forward_log "
-            "WHERE status = 'awaiting_bot' AND bot_batch_id IS NOT NULL"
+            "WHERE status IN ('awaiting_bot', 'sending') AND bot_batch_id IS NOT NULL"
         )
         batches = cur.fetchall()
     finally:
@@ -664,6 +689,7 @@ async def t2t_forward_channel_files(conn, channel_data, budget):
     hit_limit = False
     channel_exhausted = True
     channel_error = None
+    channel_error_permanent = False
 
     try:
         async for message in client.iter_messages(entity, reverse=True, min_id=last_msg_id):
@@ -690,6 +716,15 @@ async def t2t_forward_channel_files(conn, channel_data, budget):
             log.info(f"  📁 [ch:{run_forwarded+1} | budget left:{budget - run_forwarded}] {fname} ({size_mb} MB)")
             await asyncio.sleep(random.uniform(FILE_DELAY_MIN, FILE_DELAY_MAX))
 
+            # Record intent in the shared DB before Telegram can accept the file.
+            if not t2t_log_forward(
+                conn, ch_id, message.id, fname, fsize,
+                "sending", batch_id, None,
+            ):
+                channel_error = "Shared database could not checkpoint the source file"
+                channel_exhausted = False
+                break
+
             try:
                 doc = message.media.document
                 caption = message.text or message.message or ""
@@ -699,23 +734,32 @@ async def t2t_forward_channel_files(conn, channel_data, budget):
                     total_forwarded += 1
                     files_in_batch += 1
                     last_msg_id = message.id
-                    t2t_log_forward(
+                    if not t2t_log_forward(
                         conn, ch_id, message.id, fname, fsize,
                         "awaiting_bot", batch_id, getattr(sent, "id", None),
-                    )
+                    ):
+                        channel_error = "Main bot received a file but its shared-DB link could not be saved"
+                        channel_exhausted = False
+                        break
                     log.info(f"  ✅ Sent to main bot; awaiting DB checkpoint: {fname}")
                 else:
-                    t2t_log_forward(
+                    if not t2t_log_forward(
                         conn, ch_id, message.id, fname, fsize,
                         "retryable", batch_id, None,
-                    )
+                    ):
+                        channel_error = "Shared database could not record a failed send"
+                        channel_exhausted = False
+                        break
                     log.warning(f"  ❌ Telegram could not send: {fname}")
             except Exception as e:
-                log.error(f"  ❌ Error: {fname}: {e}")
-                t2t_log_forward(
+                log.error(f"  ❌ Error: {fname}: {type(e).__name__}")
+                if not t2t_log_forward(
                     conn, ch_id, message.id, fname, fsize,
                     "retryable", batch_id, None,
-                )
+                ):
+                    channel_error = "Shared database could not record a failed send"
+                    channel_exhausted = False
+                    break
 
             # Save progress every 10 files
             if run_forwarded % 10 == 0:
@@ -743,6 +787,7 @@ async def t2t_forward_channel_files(conn, channel_data, budget):
 
     except errors.ChannelPrivateError:
         channel_error = "Source channel is private or inaccessible"
+        channel_error_permanent = True
         channel_exhausted = False
         log.error(f"  ❌ Channel is private/inaccessible: {link}")
     except Exception as e:
@@ -822,8 +867,9 @@ async def t2t_forward_channel_files(conn, channel_data, budget):
 
     if channel_error:
         t2t_update_channel(
-            conn, ch_id, status="failed", scan_exhausted=False,
-            pending_batch_id=None, last_forwarded_msg_id=last_msg_id,
+            conn, ch_id, status="failed" if channel_error_permanent else "pending",
+            scan_exhausted=False, pending_batch_id=None,
+            last_forwarded_msg_id=last_msg_id,
             total_files_forwarded=total_forwarded, notes=channel_error,
         )
         log.error("  ❌ Source scan stopped; saved file checkpoints are retained.")
